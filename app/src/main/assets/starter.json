@@ -1,0 +1,689 @@
+{
+  "schemaVersion": 1,
+  "description": "Стартовый учебный набор, не полный словарь ΚΛΙΚ A2",
+  "words": [
+    {
+      "id": "starter-noun-001",
+      "greek": "σπίτι",
+      "russian": [
+        "дом"
+      ],
+      "partOfSpeech": "noun",
+      "article": "το",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-002",
+      "greek": "νερό",
+      "russian": [
+        "вода"
+      ],
+      "partOfSpeech": "noun",
+      "article": "το",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-003",
+      "greek": "ψωμί",
+      "russian": [
+        "хлеб"
+      ],
+      "partOfSpeech": "noun",
+      "article": "το",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-004",
+      "greek": "παιδί",
+      "russian": [
+        "ребёнок",
+        "ребенок"
+      ],
+      "partOfSpeech": "noun",
+      "article": "το",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-005",
+      "greek": "βιβλίο",
+      "russian": [
+        "книга"
+      ],
+      "partOfSpeech": "noun",
+      "article": "το",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-006",
+      "greek": "φίλος",
+      "russian": [
+        "друг"
+      ],
+      "partOfSpeech": "noun",
+      "article": "ο",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-007",
+      "greek": "φίλη",
+      "russian": [
+        "подруга"
+      ],
+      "partOfSpeech": "noun",
+      "article": "η",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-008",
+      "greek": "μέρα",
+      "russian": [
+        "день"
+      ],
+      "partOfSpeech": "noun",
+      "article": "η",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-009",
+      "greek": "νύχτα",
+      "russian": [
+        "ночь"
+      ],
+      "partOfSpeech": "noun",
+      "article": "η",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-010",
+      "greek": "πόλη",
+      "russian": [
+        "город"
+      ],
+      "partOfSpeech": "noun",
+      "article": "η",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-011",
+      "greek": "σχολείο",
+      "russian": [
+        "школа"
+      ],
+      "partOfSpeech": "noun",
+      "article": "το",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-012",
+      "greek": "δουλειά",
+      "russian": [
+        "работа"
+      ],
+      "partOfSpeech": "noun",
+      "article": "η",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-013",
+      "greek": "τραπέζι",
+      "russian": [
+        "стол"
+      ],
+      "partOfSpeech": "noun",
+      "article": "το",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-014",
+      "greek": "καρέκλα",
+      "russian": [
+        "стул"
+      ],
+      "partOfSpeech": "noun",
+      "article": "η",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-015",
+      "greek": "άνθρωπος",
+      "russian": [
+        "человек"
+      ],
+      "partOfSpeech": "noun",
+      "article": "ο",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-016",
+      "greek": "οικογένεια",
+      "russian": [
+        "семья"
+      ],
+      "partOfSpeech": "noun",
+      "article": "η",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-017",
+      "greek": "δρόμος",
+      "russian": [
+        "дорога",
+        "улица"
+      ],
+      "partOfSpeech": "noun",
+      "article": "ο",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-018",
+      "greek": "θάλασσα",
+      "russian": [
+        "море"
+      ],
+      "partOfSpeech": "noun",
+      "article": "η",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-019",
+      "greek": "φαγητό",
+      "russian": [
+        "еда"
+      ],
+      "partOfSpeech": "noun",
+      "article": "το",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-noun-020",
+      "greek": "χρόνος",
+      "russian": [
+        "время",
+        "год"
+      ],
+      "partOfSpeech": "noun",
+      "article": "ο",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-verb-001",
+      "greek": "διαβάζω",
+      "russian": [
+        "читать"
+      ],
+      "partOfSpeech": "verb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-verb-002",
+      "greek": "γράφω",
+      "russian": [
+        "писать"
+      ],
+      "partOfSpeech": "verb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-verb-003",
+      "greek": "μιλάω",
+      "russian": [
+        "говорить"
+      ],
+      "partOfSpeech": "verb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": [
+        "μιλώ"
+      ]
+    },
+    {
+      "id": "starter-verb-004",
+      "greek": "ακούω",
+      "russian": [
+        "слушать",
+        "слышать"
+      ],
+      "partOfSpeech": "verb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-verb-005",
+      "greek": "βλέπω",
+      "russian": [
+        "видеть"
+      ],
+      "partOfSpeech": "verb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-verb-006",
+      "greek": "θέλω",
+      "russian": [
+        "хотеть"
+      ],
+      "partOfSpeech": "verb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-verb-007",
+      "greek": "έχω",
+      "russian": [
+        "иметь"
+      ],
+      "partOfSpeech": "verb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-verb-008",
+      "greek": "πηγαίνω",
+      "russian": [
+        "идти",
+        "ехать"
+      ],
+      "partOfSpeech": "verb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-verb-009",
+      "greek": "μένω",
+      "russian": [
+        "жить",
+        "оставаться"
+      ],
+      "partOfSpeech": "verb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-verb-010",
+      "greek": "δουλεύω",
+      "russian": [
+        "работать"
+      ],
+      "partOfSpeech": "verb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-verb-011",
+      "greek": "αγοράζω",
+      "russian": [
+        "покупать"
+      ],
+      "partOfSpeech": "verb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-verb-012",
+      "greek": "μαγειρεύω",
+      "russian": [
+        "готовить",
+        "готовить еду"
+      ],
+      "partOfSpeech": "verb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-adjective-001",
+      "greek": "καλός",
+      "russian": [
+        "хороший"
+      ],
+      "partOfSpeech": "adjective",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-adjective-002",
+      "greek": "κακός",
+      "russian": [
+        "плохой"
+      ],
+      "partOfSpeech": "adjective",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-adjective-003",
+      "greek": "μεγάλος",
+      "russian": [
+        "большой"
+      ],
+      "partOfSpeech": "adjective",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-adjective-004",
+      "greek": "μικρός",
+      "russian": [
+        "маленький"
+      ],
+      "partOfSpeech": "adjective",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-adjective-005",
+      "greek": "καινούριος",
+      "russian": [
+        "новый"
+      ],
+      "partOfSpeech": "adjective",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-adjective-006",
+      "greek": "παλιός",
+      "russian": [
+        "старый"
+      ],
+      "partOfSpeech": "adjective",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-adjective-007",
+      "greek": "όμορφος",
+      "russian": [
+        "красивый"
+      ],
+      "partOfSpeech": "adjective",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-adjective-008",
+      "greek": "εύκολος",
+      "russian": [
+        "лёгкий",
+        "легкий",
+        "простой"
+      ],
+      "partOfSpeech": "adjective",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-adjective-009",
+      "greek": "δύσκολος",
+      "russian": [
+        "трудный",
+        "сложный"
+      ],
+      "partOfSpeech": "adjective",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-adjective-010",
+      "greek": "φτηνός",
+      "russian": [
+        "дешёвый",
+        "дешевый"
+      ],
+      "partOfSpeech": "adjective",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-adverb-001",
+      "greek": "εδώ",
+      "russian": [
+        "здесь"
+      ],
+      "partOfSpeech": "adverb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-adverb-002",
+      "greek": "εκεί",
+      "russian": [
+        "там"
+      ],
+      "partOfSpeech": "adverb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-adverb-003",
+      "greek": "τώρα",
+      "russian": [
+        "сейчас"
+      ],
+      "partOfSpeech": "adverb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-adverb-004",
+      "greek": "σήμερα",
+      "russian": [
+        "сегодня"
+      ],
+      "partOfSpeech": "adverb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-adverb-005",
+      "greek": "αύριο",
+      "russian": [
+        "завтра"
+      ],
+      "partOfSpeech": "adverb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-adverb-006",
+      "greek": "χτες",
+      "russian": [
+        "вчера"
+      ],
+      "partOfSpeech": "adverb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": [
+        "χθες"
+      ]
+    },
+    {
+      "id": "starter-adverb-007",
+      "greek": "πάντα",
+      "russian": [
+        "всегда"
+      ],
+      "partOfSpeech": "adverb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-adverb-008",
+      "greek": "ποτέ",
+      "russian": [
+        "никогда"
+      ],
+      "partOfSpeech": "adverb",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-numeral-001",
+      "greek": "ένα",
+      "russian": [
+        "один",
+        "одно"
+      ],
+      "partOfSpeech": "numeral",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-numeral-002",
+      "greek": "δύο",
+      "russian": [
+        "два",
+        "две"
+      ],
+      "partOfSpeech": "numeral",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-numeral-003",
+      "greek": "τρία",
+      "russian": [
+        "три"
+      ],
+      "partOfSpeech": "numeral",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-numeral-004",
+      "greek": "τέσσερα",
+      "russian": [
+        "четыре"
+      ],
+      "partOfSpeech": "numeral",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-numeral-005",
+      "greek": "πέντε",
+      "russian": [
+        "пять"
+      ],
+      "partOfSpeech": "numeral",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-numeral-006",
+      "greek": "έξι",
+      "russian": [
+        "шесть"
+      ],
+      "partOfSpeech": "numeral",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    },
+    {
+      "id": "starter-numeral-007",
+      "greek": "επτά",
+      "russian": [
+        "семь"
+      ],
+      "partOfSpeech": "numeral",
+      "article": "",
+      "source": "starter-v1",
+      "forms": [
+        "εφτά"
+      ]
+    },
+    {
+      "id": "starter-numeral-008",
+      "greek": "οκτώ",
+      "russian": [
+        "восемь"
+      ],
+      "partOfSpeech": "numeral",
+      "article": "",
+      "source": "starter-v1",
+      "forms": [
+        "οχτώ"
+      ]
+    },
+    {
+      "id": "starter-numeral-009",
+      "greek": "εννέα",
+      "russian": [
+        "девять"
+      ],
+      "partOfSpeech": "numeral",
+      "article": "",
+      "source": "starter-v1",
+      "forms": [
+        "εννιά"
+      ]
+    },
+    {
+      "id": "starter-numeral-010",
+      "greek": "δέκα",
+      "russian": [
+        "десять"
+      ],
+      "partOfSpeech": "numeral",
+      "article": "",
+      "source": "starter-v1",
+      "forms": []
+    }
+  ]
+}
