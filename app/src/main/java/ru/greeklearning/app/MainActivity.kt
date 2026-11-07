@@ -54,10 +54,11 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private var session: JSONObject? = null
     private var group = "noun"
     private var chosenMode = Mode.TO_RU
-    private val green = Color.rgb(22, 118, 107)
-    private val ink = Color.rgb(28, 48, 48)
-    private val muted = Color.rgb(105, 119, 116)
-    private val background = Color.rgb(246, 247, 243)
+    private val accent = Color.rgb(11, 94, 168)
+    private val success = Color.rgb(24, 112, 78)
+    private val ink = Color.rgb(7, 46, 83)
+    private val muted = Color.rgb(91, 108, 128)
+    private val background = Color.rgb(244, 247, 252)
     private var cachedWords: List<Word>? = null
     private val words get() = cachedWords ?: store.words().also { cachedWords = it }
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
@@ -148,7 +149,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             container.addView(fixedFooter,LinearLayout.LayoutParams(-1,-2))
             setContentView(container)
         } else setContentView(scroll)
-        if (onClose == null) label("ΕΛΛΗΝΙΚΑ  /  A2", 12, green, true) else {
+        if (onClose == null) label("αω  /  ΕΛΛΗΝΙΚΑ  A2", 12, accent, true) else {
             val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_LTR }
             page.addView(header, LinearLayout.LayoutParams(-1, -2))
             val close = ImageButton(this).apply {
@@ -159,7 +160,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 setPadding(dp(12), dp(12), dp(12), dp(12))
                 setOnClickListener { onClose() }
             }
-            label("ΕΛΛΗΝΙΚΑ  /  A2", 12, green, true, header).layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+            label("αω  /  ΕΛΛΗΝΙΚΑ  A2", 12, accent, true, header).layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
             header.addView(close, LinearLayout.LayoutParams(dp(48), dp(48)))
         }
         label(title, 26, ink, true).setPadding(0, dp(10), 0, dp(4))
@@ -188,11 +189,11 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         Button(this).apply {
             text = title; isAllCaps = false; textSize = 16f; minHeight = dp(48); minimumHeight=dp(48)
             stateListAnimator=null; elevation=0f; setPadding(dp(16),dp(10),dp(16),dp(10))
-            setTextColor(if (primary) Color.WHITE else green)
-            val surface=shape(if (primary) green else Color.WHITE,10).apply {
-                if(!primary) setStroke(dp(1),Color.rgb(228,234,230))
+            setTextColor(if (primary) Color.WHITE else accent)
+            val surface=shape(if (primary) ink else Color.WHITE,10).apply {
+                if(!primary) setStroke(dp(1),Color.rgb(219,229,240))
             }
-            background = RippleDrawable(ColorStateList.valueOf(if(primary) Color.argb(40,255,255,255) else Color.argb(24,22,118,107)),surface,shape(Color.WHITE,10))
+            background = RippleDrawable(ColorStateList.valueOf(if(primary) Color.argb(40,255,255,255) else Color.argb(24,11,94,168)),surface,shape(Color.WHITE,10))
             parent.addView(this, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
             setOnClickListener { action() }
         }
@@ -204,7 +205,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun progress(value: Points, parent: LinearLayout = page) {
         parent.addView(ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 10000; progress = (value.approximate() * 100).toInt()
-            progressTintList = android.content.res.ColorStateList.valueOf(green)
+            progressTintList = android.content.res.ColorStateList.valueOf(accent)
         }, LinearLayout.LayoutParams(-1, dp(9)).apply { topMargin = dp(8); bottomMargin = dp(12) })
     }
     private fun home() {
@@ -213,7 +214,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val list = words
         val scores = store.allPoints()
         val average = if (list.isEmpty()) Points.ZERO else scores.values.fold(Points.ZERO) { a, score -> a + score }.let { Points.of(it.n, it.d * list.size.toBigInteger()) }
-        label("${average.text()}%", 44, green, true)
+        label("${average.text()}%", 44, accent, true)
         progress(average)
         label("${list.size} слов в словаре · средний прогресс", 14, muted)
         gap()
@@ -222,7 +223,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         button("Мой словарь") { dictionary() }
         button("Добавить слово") { addWord() }
         gap(18)
-        label("СЛОВАРЬ ΚΛΙΚ A2", 12, green, true)
+        label("СЛОВАРЬ ΚΛΙΚ A2", 12, accent, true)
         label("Полный глоссарий из PDF и сохранённые стартовые слова. Русские переводы подготовлены для приложения.", 14, muted)
         label("Прогресс хранится на устройстве. Перед удалением приложения сохраните резервную копию.", 14, muted)
         button("Экспорт словаря и прогресса") {
@@ -261,7 +262,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             fun score(skill: Int)=scores[w.id to skill] ?: Points.ZERO
             val total=(0..3).fold(Points.ZERO) { value,skill -> value+score(skill) }
             label(w.display, 24, ink, true, card); label(w.russian.joinToString(", "), 16, muted, parent=card)
-            label("${Rules.parts[w.category]} · ${total.text()}%", 13, green, parent=card)
+            label("${Rules.parts[w.category]} · ${total.text()}%", 13, accent, parent=card)
             label("Перевод ${score(0).text()} · Написание ${score(1).text()}\nСлух ${score(2).text()} · Произношение ${score(3).text()}", 13, muted, parent=card)
             if(w.inflections.isNotEmpty()) label("Формы: ${w.inflections.joinToString(", ")}",13,muted,parent=card)
             if(w.sourcePages.isNotEmpty()) label("ΚΛΙΚ A2 · стр. ${w.sourcePages.sorted().joinToString(", ")}",12,muted,parent=card)
@@ -289,7 +290,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         screen(word.display,word.russian.joinToString(", "),onClose=::closeCard,closeDescription="Вернуться к списку слов")
         detailBack=::closeCard
         label(Rules.parts[word.category] ?: word.pos,14,muted)
-        label("Изучено ${store.total(word).text()}%",22,green,true)
+        label("Изучено ${store.total(word).text()}%",22,accent,true)
         label("Перевод ${store.points(word.id,0).text()}% · Написание ${store.points(word.id,1).text()}%\nСлух ${store.points(word.id,2).text()}% · Произношение ${store.points(word.id,3).text()}%",13,muted)
         button("▶ Произнести слово") { speak(word.greek) }
         val details=wordDetails.get(word.id)
@@ -302,7 +303,6 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             page.addView(card,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(8) })
             label(e.getString("greek"),19,ink,parent=card)
             label(e.getString("russian"),16,muted,parent=card)
-            label(e.optString("source"),12,muted,parent=card)
         }
         val grammar=details?.optJSONObject("grammar")
         if(grammar!=null) {
@@ -325,19 +325,36 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             if(grammar.has("rows")) table(grammar)
             grammar.optJSONArray("tenses")?.let { tenses ->
                 val holder=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
-                val titles=(0 until tenses.length()).map { tenses.getJSONObject(it).getString("title") }
-                val select=spinner(titles)
+                val tabs=LinearLayout(this).apply {
+                    orientation=LinearLayout.HORIZONTAL;setPadding(dp(4),dp(4),dp(4),dp(4))
+                    background=shape(Color.rgb(228,238,250),12);tag="tense-tabs"
+                }
+                page.addView(tabs,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(10) })
                 page.addView(holder)
+                val tabButtons=mutableListOf<Button>()
                 fun render(position: Int) {
                     holder.removeAllViews()
                     val outer=page;page=holder
                     table(tenses.getJSONObject(position));page=outer
+                    tabButtons.forEachIndexed { index,b ->
+                        b.isSelected=index==position
+                        b.background=shape(if(b.isSelected) ink else Color.TRANSPARENT,9)
+                        b.setTextColor(if(b.isSelected) Color.WHITE else accent)
+                    }
+                    route.put("tense",position)
+                    runtime.edit().putString("word-card",route.toString()).commit()
                 }
-                select.onItemSelectedListener=object: AdapterView.OnItemSelectedListener {
-                    override fun onItemSelected(p: AdapterView<*>?,v: View?,position: Int,id: Long) { render(position) }
-                    override fun onNothingSelected(p: AdapterView<*>?) {}
+                listOf("Настоящее","Прошедшее","Будущее").take(tenses.length()).forEachIndexed { index,title ->
+                    val tab=Button(this).apply {
+                        text=title;isAllCaps=false;textSize=13f;minHeight=dp(48);minimumWidth=0
+                        setPadding(dp(4),dp(8),dp(4),dp(8));tag="tense-tab:$index"
+                        contentDescription="$title, вкладка ${index+1} из ${tenses.length()}"
+                        setOnClickListener { render(index) }
+                    }
+                    tabs.addView(tab,LinearLayout.LayoutParams(0,-2,1f))
+                    tabButtons.add(tab)
                 }
-                render(0)
+                render(route.optInt("tense").coerceIn(0,tenses.length()-1))
             }
             label(grammar.optString("note"),14,muted)
         }
@@ -448,7 +465,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val feedback = s.optString("feedback")
         if (feedback.isNotEmpty()) {
             if (s.optBoolean("correct") && mode != Mode.SPEAK) { next(); return }
-            label(feedback,20,if(s.optBoolean("correct")) green else Color.rgb(166,66,40),true)
+            label(feedback,20,if(s.optBoolean("correct")) success else Color.rgb(166,66,40),true)
             if(mode == Mode.SPEAK && s.optString("recognized").isNotBlank()) label("Распознано: ${s.optString("recognized")}",17,muted)
             if(mode in listOf(Mode.WRITE,Mode.LISTEN_HARD) && feedback.startsWith("Неверно") && s.optString("draft").isNotBlank()) label("Ваш ответ: ${s.optString("draft")}",17,muted)
             label("${w.display} — ${w.russian.joinToString(", ")}",22)
@@ -494,7 +511,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                         choice.background = shape(Color.rgb(252, 218, 215))
                         choice.setTextColor(Color.rgb(164, 40, 34)); choice.contentDescription = "$text — неверный ответ"
                     } else if (pending && option.id == w.id) {
-                        choice.background = shape(Color.rgb(211, 233, 215)); choice.setTextColor(green)
+                        choice.background = shape(Color.rgb(211, 233, 215)); choice.setTextColor(success)
                     }
                 }
                 if (s.optBoolean("choiceError") && !pending) label("Неверно · −1%. Выберите другой ответ.", 16, Color.rgb(164,40,34))
@@ -505,7 +522,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 val fieldAttempt=s.getString("attempt")
                 val inputPending=s.optBoolean("answerAudioPending")
                 if(inputPending) {
-                    field.background=shape(Color.rgb(211,233,215));field.setTextColor(green)
+                    field.background=shape(Color.rgb(211,233,215));field.setTextColor(success)
                     field.isEnabled=false;field.isFocusable=false
                     field.contentDescription="Правильный ответ: ${s.optString("draft")}. Слушаем произношение."
                 }
@@ -539,7 +556,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 label("Ответ сохранён. Не удалось воспроизвести греческое слово.", 16, muted)
                 button("Повторить озвучивание") { s.put("answerAudioError", false); save(); training() }
                 button("Продолжить без звука") { suspendAnswerAudio(); next() }
-            } else label("Верно · слушаем произношение…", 16, green)
+            } else label("Верно · слушаем произношение…", 16, success)
         } else if (mode in listOf(Mode.LISTEN_HARD, Mode.SPEAK)) button("Пропустить · −1%") { answer(false,true) }
         if (s.optBoolean("answerAudioPending") && !s.optBoolean("answerAudioError") && answerAudioToken == null) playCorrectChoice(w,if(mode==Mode.WRITE) s.optString("draft").ifBlank { w.greek } else w.greek)
     }
@@ -656,7 +673,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             lateinit var b: Button
             b=button(w.display,parent=lc) {
                 if(!canChoose() || w.id in done) return@button
-                left=w;leftButton?.background=shape(Color.WHITE);b.background=shape(Color.rgb(250,222,154));leftButton=b;evaluate()
+                left=w;leftButton?.background=shape(Color.WHITE);b.background=shape(Color.rgb(218,236,253));leftButton=b;evaluate()
             }
             b.minHeight=dp(72);if(pending) b.isEnabled=false; if(w.id in done) { b.isEnabled=false; b.background=shape(Color.rgb(211,233,215)) }
         }
@@ -664,7 +681,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             lateinit var b: Button
             b=button(w.russian.first(),parent=rc) {
                 if(!canChoose() || w.id in done) return@button
-                right=w;rightButton?.background=shape(Color.WHITE);b.background=shape(Color.rgb(250,222,154));rightButton=b;evaluate()
+                right=w;rightButton?.background=shape(Color.WHITE);b.background=shape(Color.rgb(218,236,253));rightButton=b;evaluate()
             }
             b.minHeight=dp(72);if(pending) b.isEnabled=false; if(w.id in done) { b.isEnabled=false; b.background=shape(Color.rgb(211,233,215)) }
         }
@@ -709,9 +726,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             val current = store.total(word)
             val before = initial?.optString(word.id)?.takeIf { it.isNotBlank() }?.let { Points.parse(it) }
             val change = before?.let { current - it }
-            val color = when { change == null || change == Points.ZERO -> muted; change > Points.ZERO -> green; else -> Color.rgb(164,40,34) }
+            val color = when { change == null || change == Points.ZERO -> muted; change > Points.ZERO -> success; else -> Color.rgb(164,40,34) }
             val deltaText = when { change == null -> "Изменение недоступно"; change > Points.ZERO -> "+${change.text()}%"; change < Points.ZERO -> "−${(Points.ZERO-change).text()}%"; else -> "0%" }
-            if(table.childCount>0) table.addView(View(this).apply { setBackgroundColor(Color.rgb(232,236,233)) },LinearLayout.LayoutParams(-1,dp(1)).apply { leftMargin=dp(12);rightMargin=dp(12) })
+            if(table.childCount>0) table.addView(View(this).apply { setBackgroundColor(Color.rgb(222,231,242)) },LinearLayout.LayoutParams(-1,dp(1)).apply { leftMargin=dp(12);rightMargin=dp(12) })
             val row=LinearLayout(this).apply {
                 orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;layoutDirection=View.LAYOUT_DIRECTION_LTR
                 minimumHeight=dp(56);setPadding(dp(12),dp(8),dp(12),dp(8));tag="result:${word.id}"

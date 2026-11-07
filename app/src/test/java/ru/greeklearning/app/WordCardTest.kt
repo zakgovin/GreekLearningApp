@@ -65,16 +65,43 @@ class WordCardTest {
         all().filterIsInstance<Button>().first { it.text.toString()=="Продолжить тренировку" }.performClick()
         all().first { it.tag=="result:${word.id}" }.performClick()
         assertTrue(all().filterIsInstance<TextView>().any { it.text.toString()=="γράφεις" })
-        all().filterIsInstance<Spinner>().single().setSelection(1)
+        assertTrue(all().filterIsInstance<Spinner>().isEmpty())
+        assertFalse(all().filterIsInstance<TextView>().any { it.text.toString() in listOf("Tatoeba · готовый пример","Учебный пример") })
+        all().first { it.tag=="tense-tab:1" }.performClick()
         org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
         assertTrue(all().filterIsInstance<TextView>().any { it.text.toString()=="έγραψα" })
-        all().filterIsInstance<Spinner>().single().setSelection(2)
+        assertTrue(all().first { it.tag=="tense-tab:1" }.isSelected)
+        all().first { it.tag=="tense-tab:2" }.performClick()
         org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
         assertTrue(all().filterIsInstance<TextView>().any { it.text.toString()=="θα γράψω" })
         activity.onBackPressed()
         assertTrue(all().any { it.tag=="result:${word.id}" })
         assertEquals(s.toString(),context.getSharedPreferences("runtime",0).getString("session",null))
         assertTrue(all().any { it.tag=="summary-actions" })
+        controller.pause().stop().destroy();store.close()
+    }
+    @Test fun selectedTenseTabSurvivesActivityRecreation() {
+        val context=RuntimeEnvironment.getApplication();context.getSharedPreferences("runtime",0).edit().clear().commit()
+        val store=Store(context);store.seed();val word=store.words().first { it.greek=="γράφω" }
+        val state=JSONObject().put("mode",Mode.WRITE.name).put("index",1).put("ids",JSONArray(listOf(word.id)))
+        context.getSharedPreferences("runtime",0).edit().putString("session",state.toString()).commit()
+        var controller=Robolectric.buildActivity(MainActivity::class.java).setup()
+        fun all()=views(controller.get().window.decorView)
+        all().filterIsInstance<Button>().first { it.text.toString()=="Продолжить тренировку" }.performClick()
+        all().first { it.tag=="result:${word.id}" }.performClick()
+        all().first { it.tag=="tense-tab:1" }.performClick()
+        val root=controller.get().window.decorView
+        root.measure(View.MeasureSpec.makeMeasureSpec(360,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(800,View.MeasureSpec.EXACTLY));root.layout(0,0,360,800)
+        (root.findViewWithTag<android.widget.LinearLayout>("screen-content").parent as android.widget.ScrollView).scrollTo(0,2000)
+        all().forEach { it.clearAnimation() }
+        val image=Bitmap.createBitmap(360,800,Bitmap.Config.ARGB_8888);root.draw(Canvas(image))
+        File("build/reports/ux/verb-tabs.png").apply { parentFile?.mkdirs();outputStream().use { image.compress(Bitmap.CompressFormat.PNG,100,it) } }
+        controller.pause().stop().destroy();controller=Robolectric.buildActivity(MainActivity::class.java).setup()
+        assertTrue(all().first { it.tag=="tense-tab:1" }.isSelected)
+        assertFalse(all().first { it.tag=="tense-tab:0" }.isSelected)
+        assertTrue(all().filterIsInstance<TextView>().any { it.text.toString()=="έγραψα" })
+        assertTrue(all().filterIsInstance<Spinner>().isEmpty())
+        controller.get().onBackPressed();assertTrue(all().any { it.tag=="result:${word.id}" })
         controller.pause().stop().destroy();store.close()
     }
     @Test fun referenceHasAllExistingIdsAndBasicIrregularForms() {

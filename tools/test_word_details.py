@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json,unittest
 from pathlib import Path
+from example_matching import matches_example,lexical_forms
 ROOT=Path(__file__).resolve().parents[1]
 class DetailsTest(unittest.TestCase):
  def setUp(self):
@@ -29,4 +30,17 @@ class DetailsTest(unittest.TestCase):
      split='test' if '/test/' in e['url'] else 'dev'
      lines=(ROOT/f'data/word-details/tatoeba-{split}.tsv').read_text().splitlines()
      row=lines[e['line']-1].split('\t');self.assertEqual(row[2:], [e['greek'],e['russian']])
+ def test_every_example_contains_its_own_greek_lexeme(self):
+  for word in self.words:
+   data=self.data[word['id']]
+   for example in data['examples']:
+    self.assertTrue(matches_example(word,data['grammar'],example['greek']),(word['greek'],example['greek']))
+ def test_shared_articles_and_russian_synonyms_do_not_link_unrelated_words(self):
+  sport=next(w for w in self.words if w['greek']=='άθλημα')
+  board=next(w for w in self.words if w['greek']=='πίνακας')
+  self.assertFalse(matches_example(sport,self.entry('άθλημα')['grammar'],'Αυτός έχει όλων των ειδών τα βιβλία.'))
+  self.assertFalse(matches_example(board,self.entry('πίνακας')['grammar'],'Αυτή είναι η εικόνα που εσύ ο ίδιος ζωγράφισες;'))
+  self.assertTrue(matches_example(sport,self.entry('άθλημα')['grammar'],'Ποιο άθλημα σου αρέσει;'))
+  self.assertTrue(matches_example(board,self.entry('πίνακας')['grammar'],'Ο δάσκαλος γράφει στον πίνακα.'))
+  for word in [sport,board]:self.assertNotIn(('των',),lexical_forms(word,self.data[word['id']]['grammar']))
 if __name__=='__main__':unittest.main()

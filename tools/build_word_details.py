@@ -2,11 +2,12 @@
 """Build offline A2 reference data. Requires modern-greek-inflexion 2.0.7 and pymorphy3.
 See docs/word-details.ru.md for sources, attribution and the dependency compatibility patch.
 """
-import json,re,hashlib,unicodedata
+import json,re,hashlib,unicodedata,sys
 from pathlib import Path
 from collections import defaultdict,Counter
 from modern_greek_inflexion import Noun,Adjective,Verb
 import pymorphy3
+from example_matching import lexical_forms,matches_example
 ROOT=Path(__file__).resolve().parents[1]
 WORDS=json.loads((ROOT/'app/src/main/assets/a2.json').read_text())['words']
 RU=pymorphy3.MorphAnalyzer()
@@ -124,16 +125,13 @@ def authored(w):
     return {'greek':el,'russian':r,'source':'Учебный пример','url':''}
 
 def main():
+    existing=json.loads((ROOT/'app/src/main/assets/word-details.json').read_text())['words'] if '--examples-only' in sys.argv else None
     details={};index=defaultdict(set);lexicon=set()
-    phrase_forms={}
     for i,w in enumerate(WORDS):
-        gr=grammar(w);details[w['id']]={'grammar':gr,'examples':[]}
-        phrase_forms[i]=[' '.join(tokens(t)) for t in all_strings(gr) if len(tokens(t))>1]+[' '.join(tokens(w['greek']))]
-        forms=set(tokens(w['greek']))
-        for s in all_strings(gr):
-            for t in tokens(s):forms.add(t)
-        for form in forms:index[form].add(i)
-        lexicon.update(forms)
+        gr=existing[w['id']]['grammar'] if existing else grammar(w)
+        details[w['id']]={'grammar':gr,'examples':[]}
+        for form in lexical_forms(w,gr):
+            for token in form:index[token].add(i);lexicon.add(token)
     corpus=[]
     for split in ['test','dev']:
         for line_id,line in enumerate((ROOT/f'data/word-details/tatoeba-{split}.tsv').read_text().splitlines(),1):
@@ -141,6 +139,7 @@ def main():
             if len(cols)!=4:continue
             el,ru=cols[2:];tt=tokens(el)
             if not 2<=len(tt)<=9 or len(el)>100 or len(ru)>140:continue
+            if re.search('[A-Za-z]',el):continue
             if sum(t not in lexicon for t in tt)>1:continue
             if re.search(r'убий|убить|суицид|секс|порно|наркот|ненавиж|расист|Tom|Mary',ru,re.I):continue
             corpus.append((len(tt)+sum(t not in lexicon for t in tt)*3,el,ru,split,line_id,tt))
@@ -148,17 +147,23 @@ def main():
         candidates=set().union(*(index[t] for t in tt));rul=ru_words(ru)
         for i in candidates:
             w=WORDS[i];d=details[w['id']]
-            if len(tokens(w['greek']))>1 and not any(' '+f+' ' in ' '+' '.join(tt)+' ' for f in phrase_forms[i]):continue
+            if not matches_example(w,d['grammar'],el):continue
             if len(d['examples'])>=3:continue
             # A Greek inflection alone can be homonymous. Require the Russian sense too.
-            meanings=set().union(*(ru_words(r) for r in w['russian']))
-            if not meanings.intersection(rul):continue
+            meanings=[ru_words(r) for r in w['russian']]
+            if not any(meaning and meaning.issubset(rul) for meaning in meanings):continue
             if w['partOfSpeech'] in ['adverb','pronoun','preposition','conjunction','particle','article'] and w['greek'].lower() not in tt:continue
             if any(x['greek']==el for x in d['examples']):continue
             d['examples'].append({'greek':el,'russian':ru,'source':'Tatoeba · готовый пример','url':f'https://github.com/Helsinki-NLP/Tatoeba-Challenge/blob/master/data/release/{split}/v2023-09-26/tatoeba-{split}-v2023-09-26.ell-rus.txt.gz','line':line_id})
-    sourced=sum(bool(x['examples']) for x in details.values())
+    reviewed=json.loads((ROOT/'data/word-details/reviewed-examples.json').read_text())
+    for w in WORDS:
+        if w['greek'] in reviewed:
+            details[w['id']]['examples']=[{'greek':el,'russian':ru,'source':'Учебный пример','url':''} for el,ru in reviewed[w['greek']]]
+    sourced=sum(any(e['url'] for e in x['examples']) for x in details.values())
     for w in WORDS:
         if not details[w['id']]['examples']:details[w['id']]['examples']=[authored(w)]
+    for w in WORDS:
+        assert all(matches_example(w,details[w['id']]['grammar'],e['greek']) for e in details[w['id']]['examples']),w['greek']
     report={'words':len(details),'readyExamplesWords':sourced,'grammarKinds':dict(Counter(x['grammar']['kind'] for x in details.values())),'errors':ERRORS}
     (ROOT/'data/word-details/coverage.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
     (ROOT/'app/src/main/assets/word-details.json').write_text(json.dumps({'version':1,'words':details},ensure_ascii=False,indent=2)+'\n')
