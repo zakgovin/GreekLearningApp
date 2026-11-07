@@ -43,7 +43,8 @@ class DailyLayoutTest {
         all().forEach { it.clearAnimation() }
         val bitmap=Bitmap.createBitmap(360,800,Bitmap.Config.ARGB_8888);root.draw(Canvas(bitmap))
         File("build/reports/ux/daily-home.png").apply { parentFile?.mkdirs();outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) } }
-        click("История по дням")
+        assertFalse(all().filterIsInstance<Button>().any { it.text.toString() in listOf("История по дням","Добавить слово") })
+        all().first { it.tag=="daily-progress" }.performClick()
         assertTrue(all().any { it.tag=="daily-history:$today" })
         assertTrue(all().any { it.tag=="daily-history:${today.minusDays(1)}" })
         click("Более ранние дни");assertTrue(all().any { it.tag=="daily-history:$old" })

@@ -78,6 +78,6 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## Текущее состояние
 
-Версия **0.5.0** (versionCode 34). [Проверки](docs/validation-0.5.0.ru.md): 85 Android/JVM-тестов и lint. [Состояние разработки](docs/development-status.ru.md), [инструкции продолжения](AGENTS.md). Исходники, полный словарь, тесты и инструкции сборки хранятся в Git; локальные SDK, ключи подписи и APK исключены.
+Версия **0.5.1** (versionCode 35). [Проверки](docs/validation-0.5.1.ru.md): 93 Android/JVM-теста и lint. [Состояние разработки](docs/development-status.ru.md), [инструкции продолжения](AGENTS.md). Исходники, полный словарь, тесты и инструкции сборки хранятся в Git; локальные SDK, ключи подписи и APK исключены.
 
 Дневной прогресс: отдельный счётчик повторов, цель 10–10000 и история по дням. [Правила и сохранение статистики](docs/daily-progress.ru.md).

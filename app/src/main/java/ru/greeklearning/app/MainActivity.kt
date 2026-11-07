@@ -141,7 +141,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         else home()
     }
     private fun shape(color: Int, radius: Int = 12) = GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat() }
-    private fun screen(title: String, subtitle: String = "", onClose: (() -> Unit)? = null, closeDescription: String = "Выйти и сохранить", pinnedActions: Boolean = false) {
+    private fun screen(title: String, subtitle: String = "", onClose: (() -> Unit)? = null, closeDescription: String = "Выйти и сохранить", pinnedActions: Boolean = false, onAdd: (() -> Unit)? = null) {
         dailyHandler.removeCallbacks(dayRefresh)
         homeVisible=false
         dailyPageIndex=null
@@ -186,6 +186,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 setOnClickListener { onClose() }
             }
             label("αω  /  ΕΛΛΗΝΙΚΑ  A2", 12, accent, true, header).layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+            if(onAdd!=null) header.addView(actionIcon(android.R.drawable.ic_input_add,"Добавить слово",onAdd),LinearLayout.LayoutParams(dp(48),dp(48)))
             header.addView(close, LinearLayout.LayoutParams(dp(48), dp(48)))
         }
         label(title, 26, ink, true).setPadding(0, dp(10), 0, dp(4))
@@ -202,6 +203,13 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             }
             page.startAnimation(transition)
         }
+    }
+    private fun actionIcon(resource: Int,description: String,action: () -> Unit): ImageButton = ImageButton(this).apply {
+        setImageResource(resource);contentDescription=description
+        imageTintList=ColorStateList.valueOf(muted)
+        val attrs=obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackgroundBorderless))
+        setBackgroundResource(attrs.getResourceId(0,0));attrs.recycle()
+        setPadding(dp(12),dp(12),dp(12),dp(12));setOnClickListener { action() }
     }
     private fun gap(size: Int = 10) { page.addView(View(this), LinearLayout.LayoutParams(1, dp(size))) }
     private fun label(value: String, size: Int = 17, color: Int = ink, bold: Boolean = false, parent: LinearLayout = page): TextView =
@@ -259,12 +267,10 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         dayPanel.isClickable=true;dayPanel.isFocusable=true
         dayPanel.contentDescription="Сегодня ${today.count} слов из $goal. Открыть историю по дням"
         dayPanel.setOnClickListener { dailyHistory() }
-        button("История по дням") { dailyHistory() }
         gap()
         if (session != null) button("Продолжить тренировку", true) { training() }
         button("Начать тренировку", session == null) { setup() }
         button("Мой словарь") { dictionary() }
-        button("Добавить слово") { addWord() }
         gap(18)
         label("СЛОВАРЬ ΚΛΙΚ A2", 12, accent, true)
         label("Полный глоссарий из PDF и сохранённые стартовые слова. Русские переводы подготовлены для приложения.", 14, muted)
@@ -290,7 +296,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         screen("Дневная цель","От 10 до 10 000 слов в день.",onClose=onSaved,closeDescription="Вернуться назад")
         detailBack=onSaved
         val field=input("10–10000",store.dailyGoal().toString()).apply { inputType=android.text.InputType.TYPE_CLASS_NUMBER;tag="daily-goal-input" }
-        label("Каждый ответ, ошибка или пропуск добавляет слово к дневному счётчику. Повторы учитываются заново. Неверная пара в сопоставлении учитывает оба слова. Нажатие подсказки и технические сбои звука сами по себе не считаются ответом.",15,muted)
+        label("Одно завершённое задание со словом — один плюс. Ошибки до правильного выбора в сопоставлении и выборе ответа не добавляют повторных плюсов. В остальных режимах ошибка или пропуск завершают задание и учитываются один раз. Повтор слова в новом задании считается заново. Подсказки и технические сбои не добавляют плюсов.",15,muted)
         label("Цель действует сегодня и в следующие дни. Можно тренироваться и после её достижения.",15,muted)
         button("Сохранить",true) {
             val goal=field.text.toString().toIntOrNull()
@@ -325,7 +331,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         scheduleDayRefresh()
     }
     private fun dictionary(query: String = "", pageIndex: Int = 0, category: String? = null) {
-        screen("Мой словарь", "Каждый навык — до 25%. Вместе — до 100%.",onClose=::home,closeDescription="На главную")
+        screen("Мой словарь", "Каждый навык — до 25%. Вместе — до 100%.",onClose=::home,closeDescription="На главную",
+            onAdd={ addWord { dictionary(query,pageIndex,category) } })
         val categories=listOf<String?>(null)+Rules.parts.keys.toList()
         val filter=spinner(listOf("Все категории")+Rules.parts.values.toList())
         filter.setSelection(categories.indexOf(category).coerceAtLeast(0))
@@ -474,16 +481,16 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, items)
         page.addView(this, LinearLayout.LayoutParams(-1, dp(54)))
     }
-    private fun addWord() {
-        screen("Новое слово", "Базовая форма и русские переводы. Синонимы разделяйте точкой с запятой.")
+    private fun addWord(onBack: () -> Unit) {
+        screen("Новое слово", "Базовая форма и русские переводы. Синонимы разделяйте точкой с запятой.",onClose=onBack,closeDescription="Вернуться в словарь")
+        detailBack=onBack
         val greek = input("Греческое слово"); val article = input("Артикль, если есть: ο / η / το")
         val russian = input("Перевод; другой допустимый перевод")
         val keys = Rules.parts.keys.toList(); val part = spinner(Rules.parts.values.toList())
         button("Добавить", true) {
             runCatching { store.add(greek.text.toString(), russian.text.toString(), keys[part.selectedItemPosition], article.text.toString()) }
-                .onSuccess { cachedWords=null; message("Слово добавлено"); home() }.onFailure { message(it.message ?: "Проверьте поля") }
+                .onSuccess { cachedWords=null; message("Слово добавлено"); onBack() }.onFailure { message(it.message ?: "Проверьте поля") }
         }
-        button("Назад") { home() }
     }
     private fun setup() {
         screen("Выберите тренировку",onClose=::home,closeDescription="На главную")
@@ -502,11 +509,22 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             Mode.LISTEN_HARD -> "Послушайте греческое слово и введите перевод по-русски. +1% за верный ответ, −1% за ошибку или пропуск. При ошибке можно сравнить свой ответ с правильным."
             Mode.SPEAK -> "Произнесите греческое слово по русскому переводу, в базовой форме. Существительное можно произнести с правильным артиклем или без него. +1% за верный ответ, −1% за ошибку или пропуск. Подсказок нет."
         }
+        val countRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL }
+        page.addView(countRow,LinearLayout.LayoutParams(-1,-2))
+        fun countText()="Слов за тренировку: ${prefs.getInt(chosenMode.name,10).coerceIn(1,100)}"
+        val selectedCount=label(countText(),16,ink,parent=countRow).apply {
+            layoutParams=LinearLayout.LayoutParams(0,-2,1f);tag="training-count"
+        }
+        countRow.addView(actionIcon(android.R.drawable.ic_menu_manage,"Настроить количество слов") {
+            group=availableGroups[part.selectedItemPosition];chosenMode=Mode.entries[mode.selectedItemPosition]
+            settings()
+        }.apply { tag="training-settings" },LinearLayout.LayoutParams(dp(48),dp(48)))
         val explanation = label(description(chosenMode),14,muted)
         mode.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
                 chosenMode = Mode.entries[position]
                 explanation.text = description(chosenMode)
+                selectedCount.text=countText()
             }
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }
@@ -529,10 +547,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             save(); training()
             if (selected.size < size) message("В группе доступно ${selected.size} слов — все включены в тренировку.")
         }
-        button("Настроить количество слов") {
-            group=availableGroups[part.selectedItemPosition];chosenMode=Mode.entries[mode.selectedItemPosition]
-            settings()
-        }
+
     }
     private fun save() { runtime.edit().apply { if (session == null) remove("session") else putString("session",session.toString()) }.commit() }
     private fun currentWords(): List<Word> {
@@ -683,7 +698,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
         val hints = if(mode == Mode.WRITE) s.optInt("hints") else 0
         val delta = Rules.delta(correct,skipped,hints,Rules.letterCount(w.greek))
-        store.apply(s.getString("attempt"),mode,mapOf(w.id to delta),if(skipped) "skipped" else if(correct) "correct" else "incorrect",scoringSessionId(mode))
+        val runId=scoringSessionId(mode)
+        store.apply(s.getString("attempt"),mode,mapOf(w.id to delta),if(skipped) "skipped" else if(correct) "correct" else "incorrect",runId,"$runId:${mode.name}:${s.getInt("index")}:${w.id}")
         val key = if(!correct) "wrong" else if(hints>0) "assisted" else "right"
         s.put(key,s.getInt(key)+1)
         if(mode in listOf(Mode.WRITE,Mode.LISTEN_HARD) && correct && !skipped) {
@@ -739,7 +755,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             if(!canChoose()) return
             val l=left ?: return; val r=right ?: return
             val ok=l.id==r.id; val changes=if(ok) mapOf(l.id to Points.fraction(1,1)) else mapOf(l.id to Points.fraction(-1,1),r.id to Points.fraction(-1,1))
-            store.apply(s.getString("attempt"),Mode.MATCH,changes,if(ok) "correct" else "incorrect",scoringSessionId(Mode.MATCH))
+            val runId=scoringSessionId(Mode.MATCH)
+            store.apply(s.getString("attempt"),Mode.MATCH,changes,if(ok) "correct" else "incorrect",runId,if(ok) "$runId:MATCH:$offset:${l.id}" else null)
             val key=if(ok) "right" else "wrong"; s.put(key,s.getInt(key)+1)
             s.put("attempt",UUID.randomUUID().toString())
             s.remove("matchFeedback")

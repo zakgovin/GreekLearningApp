@@ -10,7 +10,7 @@ import java.util.UUID
 
 class Store(private val context: Context,
             now: () -> java.time.Instant = { java.time.Instant.now() },
-            zone: () -> java.time.ZoneId = { java.time.ZoneId.systemDefault() }) : SQLiteOpenHelper(context, "learning.db", null, 5) {
+            zone: () -> java.time.ZoneId = { java.time.ZoneId.systemDefault() }) : SQLiteOpenHelper(context, "learning.db", null, 6) {
     private val daily=DailyTracking(now,zone)
     fun today()=daily.today()
     fun dailyProgress(day: java.time.LocalDate=today())=daily.get(readableDatabase,day)
@@ -30,11 +30,11 @@ class Store(private val context: Context,
         db.execSQL("CREATE TABLE session_balances(sessionId TEXT NOT NULL,wordId TEXT NOT NULL,skill INTEGER NOT NULL,balance TEXT NOT NULL,PRIMARY KEY(sessionId,wordId,skill))")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        require(oldVersion in 1..4 && newVersion == 5) { "Explicit non-destructive migration required: $oldVersion → $newVersion" }
+        require(oldVersion in 1..5 && newVersion == 6) { "Explicit non-destructive migration required: $oldVersion → $newVersion" }
         if (oldVersion < 2) db.execSQL("CREATE TABLE metadata(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
         if (oldVersion < 3) createSessionBalances(db)
         if(oldVersion < 4) createReviewQueue(db)
-        if(oldVersion < 5) daily.initialize(db)
+        if(oldVersion < 6) daily.initialize(db)
     }
     private fun createReviewQueue(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE review_queue(wordId TEXT NOT NULL,mode TEXT NOT NULL,originSession TEXT NOT NULL,queuedAt INTEGER NOT NULL,PRIMARY KEY(wordId,mode))")
@@ -82,11 +82,12 @@ class Store(private val context: Context,
     fun total(word: Word) = (0..3).fold(Points.ZERO) { a, skill -> a + points(word.id, skill) }
 
     /** One transaction covers BOTH words of an incorrect match and its idempotency marker. */
-    fun apply(attemptId: String, mode: Mode, changes: Map<String, Points>, outcome: String, sessionId: String? = null): Boolean {
+    fun apply(attemptId: String, mode: Mode, changes: Map<String, Points>, outcome: String, sessionId: String? = null, practiceKey: String? = null): Boolean {
         val db = writableDatabase; db.beginTransaction()
         try {
+            if(practiceKey!=null && daily.completed(db,practiceKey)) { db.setTransactionSuccessful();return false }
             val attempt = daily.stamp(JSONObject().put("id", attemptId).put("mode", mode.name).put("outcome", outcome)
-                .put("sessionId",sessionId).put("changes", JSONObject().apply { changes.forEach { (id, d) -> put(id, d.toString()) } }))
+                .put("sessionId",sessionId).put("practiceKey",practiceKey).put("changes", JSONObject().apply { changes.forEach { (id, d) -> put(id, d.toString()) } }))
             val inserted = db.insertWithOnConflict("attempts", null, ContentValues().apply { put("id", attemptId); put("payload", attempt.toString()) }, SQLiteDatabase.CONFLICT_IGNORE)
             if (inserted == -1L) { db.setTransactionSuccessful(); return false }
             changes.forEach { (id, delta) ->
@@ -168,6 +169,7 @@ class Store(private val context: Context,
         for(i in 0 until attempts.length()) {
             val a=attempts.getJSONObject(i)
             if(a.has("localDay")) DailyTracking.parseDay(a.getString("localDay"))
+            if(a.has("practiceKey")) require(a.getString("practiceKey").length in 1..1000)
         }
         val review=root.optJSONArray("reviewQueue") ?: JSONArray()
         require(review.length()<=words.size*Mode.entries.size)

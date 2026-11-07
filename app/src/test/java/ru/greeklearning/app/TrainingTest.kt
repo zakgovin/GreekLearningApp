@@ -512,20 +512,46 @@ class TrainingTest {
         session(Mode.SPEAK,listOf(word));click("Пропустить · −1%")
         assertEquals(Points.fraction(1,1),store.points(word.id,3))
         assertTrue(all().filterIsInstance<android.widget.TextView>().any { it.text.toString().contains(word.display) })
-    }    @Test fun dailyPracticeCountsRealAttemptsButNotSpeechCompletionOrRecreation() {
+    }
+    @Test fun dailyPracticeCountsRealAttemptsButNotSpeechCompletionOrRecreation() {
         val list=listOf(store.words().first { it.greek=="νερό" },store.words().first { it.greek=="σπίτι" })
         session(Mode.TO_EL,list)
         val options=saved().getJSONArray("options")
         val wrong=(0 until options.length()).map { options.getString(it) }.first { it!=list[0].id }
         click(store.words().first { it.id==wrong }.display)
-        assertEquals(1L,store.dailyProgress().count)
-        click(list[0].display);assertEquals(2L,store.dailyProgress().count)
+        assertEquals(0L,store.dailyProgress().count)
+        click(list[0].display);assertEquals(1L,store.dailyProgress().count)
         val token=audioToken();finishAudio(token);finishAudio(token)
-        assertEquals(2L,store.dailyProgress().count)
+        assertEquals(1L,store.dailyProgress().count)
         all().filterIsInstance<android.widget.ImageButton>().single { it.contentDescription=="Выйти и сохранить" }.performClick()
-        assertEquals("2",all().filterIsInstance<android.widget.TextView>().single { it.tag=="daily-count" }.text.toString())
+        assertEquals("1",all().filterIsInstance<android.widget.TextView>().single { it.tag=="daily-count" }.text.toString())
         controller!!.pause().stop().destroy();controller=Robolectric.buildActivity(MainActivity::class.java).setup()
-        assertEquals("2",all().filterIsInstance<android.widget.TextView>().single { it.tag=="daily-count" }.text.toString())
+        assertEquals("1",all().filterIsInstance<android.widget.TextView>().single { it.tag=="daily-count" }.text.toString())
+    }
+    @Test fun wrongMatchingPairThenBothCorrectPairsCountsOnlyTwoWords() {
+        val list=store.words().filter { it.category=="noun" }.take(2);session(Mode.MATCH,list)
+        click(list[0].display);click(list[1].russian.first())
+        assertEquals(0L,store.dailyProgress().count)
+        shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(600))
+        click(list[0].display);click(list[0].russian.first());assertEquals(1L,store.dailyProgress().count);finishAudio()
+        click(list[1].display);click(list[1].russian.first());assertEquals(2L,store.dailyProgress().count);finishAudio()
+        assertEquals(2L,store.dailyProgress().count)
+    }
+    @Test fun allChoiceModesRetrySameWordWithoutInflatingDailyCount() {
+        val list=listOf(store.words().first { it.greek=="νερό" },store.words().first { it.greek=="σπίτι" })
+        for(mode in listOf(Mode.TO_RU,Mode.TO_EL,Mode.LISTEN_EASY)) {
+            val before=store.dailyProgress().count
+            session(mode,list,audioHeard=true)
+            val options=saved().getJSONArray("options")
+            val wrongId=(0 until options.length()).map { options.getString(it) }.first { it!=list[0].id }
+            val wrong=store.words().first { it.id==wrongId }
+            click(if(mode==Mode.TO_EL) wrong.display else wrong.russian.first())
+            assertEquals(before,store.dailyProgress().count)
+            click(if(mode==Mode.TO_EL) list[0].display else list[0].russian.first())
+            assertEquals(before+1,store.dailyProgress().count);finishAudio()
+            assertEquals(before+1,store.dailyProgress().count)
+            controller!!.pause().stop().destroy();controller=null
+        }
     }
 
 }

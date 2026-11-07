@@ -23,17 +23,19 @@ class DailyTrackingTest {
     private fun open()=Store(context,{instant},{zone})
     @Before fun setup() { context.deleteDatabase("learning.db");store=open();store.seed() }
     @After fun close() { store.close();context.deleteDatabase("learning.db") }
-    @Test fun repeatsErrorsSkipsHintsAndBothMismatchedWordsCountWithoutDoubleCallbacks() {
+    @Test fun retryErrorsDoNotCountWhileTerminalOutcomesAndHintsCountOnce() {
         val ids=store.words().take(2).map { it.id }
         store.apply("answer1",Mode.WRITE,mapOf(ids[0] to Points.ZERO),"correct")
         assertEquals(1L,store.dailyProgress().count)
         store.apply("answer2",Mode.TO_RU,mapOf(ids[0] to Points.fraction(-1,1)),"incorrect")
         store.apply("answer3",Mode.SPEAK,mapOf(ids[0] to Points.fraction(-1,1)),"skipped")
         store.apply("pair",Mode.MATCH,ids.associateWith { Points.fraction(-1,1) },"incorrect")
-        assertEquals(5L,store.dailyProgress().count)
+        assertEquals(2L,store.dailyProgress().count)
         assertFalse(store.apply("pair",Mode.MATCH,ids.associateWith { Points.fraction(-1,1) },"incorrect"))
-        assertEquals(5L,store.dailyProgress().count)
-        store.close();store=open();assertEquals(5L,store.dailyProgress().count)
+        store.apply("pair-corrected",Mode.MATCH,mapOf(ids[0] to Points.fraction(1,1)),"correct")
+        store.apply("choice-corrected",Mode.TO_RU,mapOf(ids[0] to Points.fraction(1,1)),"correct")
+        assertEquals(4L,store.dailyProgress().count)
+        store.close();store=open();assertEquals(4L,store.dailyProgress().count)
     }
     @Test fun midnightResetsTodayWhilePastGoalsAndZeroActivityDaysRemain() {
         val id=store.words().first().id;val first=store.today()
@@ -75,18 +77,19 @@ class DailyTrackingTest {
     @Test fun versionFourUpgradeBackfillsOldAttemptsOnceWithoutTouchingWordProgress() {
         val ids=store.words().take(2).map { it.id };instant=Instant.parse("2026-11-07T12:00:00Z")
         store.apply("old-pair",Mode.MATCH,ids.associateWith { Points.fraction(-1,1) },"incorrect","old-session")
+        store.apply("old-writing",Mode.WRITE,mapOf(ids[0] to Points.fraction(-1,1)),"incorrect")
         val points=store.allPoints();val reviews=store.reviewIds(Mode.MATCH)
         val db=store.writableDatabase
         db.execSQL("UPDATE attempts SET payload=? WHERE id='old-pair'",arrayOf(JSONObject(db.rawQuery("SELECT payload FROM attempts WHERE id='old-pair'",null).use { it.moveToFirst();it.getString(0) }).apply { remove("localDay") }.toString()))
         db.execSQL("INSERT INTO attempts VALUES ('old-marker','{}')")
         db.execSQL("DROP TABLE daily_counts");db.execSQL("DROP TABLE daily_goals")
-        db.execSQL("DELETE FROM metadata WHERE key='daily-stats-v1'");db.version=4;store.close()
+        db.execSQL("DELETE FROM metadata WHERE key LIKE 'daily-stats-v%'");db.version=4;store.close()
         instant=Instant.parse("2026-11-08T12:00:00Z");store=open()
-        assertEquals(5,store.readableDatabase.version)
-        assertEquals(2L,store.dailyProgress(LocalDate.parse("2026-11-07")).count)
+        assertEquals(6,store.readableDatabase.version)
+        assertEquals(1L,store.dailyProgress(LocalDate.parse("2026-11-07")).count)
         assertNull(store.dailyProgress(LocalDate.parse("2026-11-07")).goal)
         assertEquals(points,store.allPoints());assertEquals(reviews,store.reviewIds(Mode.MATCH))
-        store.close();store=open();assertEquals(2L,store.dailyProgress(LocalDate.parse("2026-11-07")).count)
+        store.close();store=open();assertEquals(1L,store.dailyProgress(LocalDate.parse("2026-11-07")).count)
     }
     @Test fun backupRestoreKeepsGoalsHistoryAndDuplicateImportDoesNotAddPractice() {
         val first=store.today();val id=store.words().first().id
@@ -115,13 +118,60 @@ class DailyTrackingTest {
         store.close();context.deleteDatabase("learning.db");zone=ZoneId.of("UTC");store=open();store.importData(frozen)
         assertEquals(1L,store.dailyProgress(LocalDate.parse("2026-11-09")).count)
         assertEquals(0L,store.dailyProgress(LocalDate.parse("2026-11-08")).count)
-    }    @Test fun restoringAnOlderBackupKeepsConfiguredGoalForFutureDays() {
+    }
+    @Test fun restoringAnOlderBackupKeepsConfiguredGoalForFutureDays() {
         val first=store.today();store.setDailyGoal(42)
         val backup=store.backup();store.close();context.deleteDatabase("learning.db")
         instant=instant.plusSeconds(3*86400);store=open();store.importData(backup)
         assertEquals(42,store.dailyGoal())
         assertEquals(42,store.dailyProgress(first.plusDays(1)).goal)
         assertEquals(42,store.dailyProgress(first).goal)
+    }
+    @Test fun everyModeCountsOneCompletionAndLegitimateWordRepetition() {
+        val id=store.words().first().id
+        for(mode in Mode.entries) {
+            val before=store.dailyProgress().count;val key="run:${mode.name}:0:$id"
+            val retry=mode in listOf(Mode.MATCH,Mode.TO_RU,Mode.TO_EL,Mode.LISTEN_EASY)
+            store.apply("error-$mode",mode,mapOf(id to Points.fraction(-1,1)),"incorrect","run",key)
+            assertEquals(before+if(retry) 0 else 1,store.dailyProgress().count)
+            store.apply("correct-$mode",mode,mapOf(id to Points.fraction(1,1)),"correct","run",key)
+            assertEquals(before+1,store.dailyProgress().count)
+            store.apply("repeat-$mode",mode,mapOf(id to Points.fraction(1,1)),"correct","run","run:${mode.name}:1:$id")
+            assertEquals(before+2,store.dailyProgress().count)
+        }
+    }
+    @Test fun questionIdentityDeduplicatesDifferentAttemptIdsAcrossMidnightAndRestore() {
+        val id=store.words().first().id;val first=store.today()
+        store.apply("first-submit",Mode.WRITE,mapOf(id to Points.fraction(1,1)),"correct","session","session:WRITE:0:$id")
+        instant=instant.plusSeconds(86400)
+        assertFalse(store.apply("resubmitted-new-id",Mode.WRITE,mapOf(id to Points.fraction(1,1)),"correct","session","session:WRITE:0:$id"))
+        assertEquals(Points.fraction(1,1),store.points(id,1))
+        assertEquals(0L,store.dailyProgress().count)
+        store.apply("next-occurrence",Mode.WRITE,mapOf(id to Points.fraction(1,1)),"correct","session","session:WRITE:1:$id")
+        val backup=store.backup();store.close();context.deleteDatabase("learning.db");store=open();store.importData(backup);store.importData(backup)
+        assertEquals(1L,store.dailyProgress(first).count);assertEquals(1L,store.dailyProgress().count)
+    }
+    @Test fun versionFiveMigrationRepairs118To110AndRetainsHistoryGoalsAndWordScores() {
+        val ids=store.words().take(2).map { it.id };val day=store.today();store.setDailyGoal(200)
+        repeat(110) { store.apply("completed-$it",Mode.MATCH,mapOf(ids[it%2] to Points.fraction(1,1)),"correct","old-run") }
+        repeat(4) { store.apply("mismatch-$it",Mode.MATCH,ids.associateWith { Points.fraction(-1,1) },"incorrect","old-run") }
+        val points=store.allPoints();val reviews=store.reviewIds(Mode.MATCH)
+        val db=store.writableDatabase
+        db.execSQL("UPDATE daily_counts SET count=118 WHERE day=?",arrayOf(day.toString()))
+        db.execSQL("DROP TABLE daily_completions")
+        db.execSQL("DELETE FROM metadata WHERE key='daily-stats-v2'")
+        db.version=5;store.close();instant=instant.plusSeconds(86400);store=open()
+        assertEquals(6,store.readableDatabase.version)
+        assertEquals(DailyProgress(day,110,200),store.dailyProgress(day))
+        assertEquals(200,store.dailyGoal());assertEquals(0L,store.dailyProgress().count)
+        assertEquals(points,store.allPoints());assertEquals(reviews,store.reviewIds(Mode.MATCH))
+        store.close();store=open();assertEquals(110L,store.dailyProgress(day).count)
+    }
+    @Test fun retryOnlyDaysRemainInHistoryWithZeroCompletedWords() {
+        instant=instant.minusSeconds(86400)
+        val day=store.today();val id=store.words().first().id
+        store.apply("uncompleted",Mode.TO_RU,mapOf(id to Points.fraction(-1,1)),"incorrect","run","run:TO_RU:0:$id")
+        assertEquals(0L,store.dailyProgress(day).count);assertEquals(day,store.firstActivityDay())
     }
 
 }

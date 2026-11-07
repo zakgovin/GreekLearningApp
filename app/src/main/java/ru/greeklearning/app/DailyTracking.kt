@@ -16,13 +16,23 @@ internal class DailyTracking(private val now: () -> Instant, private val zone: (
     fun initialize(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE IF NOT EXISTS daily_counts(day TEXT PRIMARY KEY,count INTEGER NOT NULL CHECK(count>=0))")
         db.execSQL("CREATE TABLE IF NOT EXISTS daily_goals(day TEXT PRIMARY KEY,goal INTEGER NOT NULL CHECK(goal BETWEEN 10 AND 10000))")
-        val initialized=db.rawQuery("SELECT 1 FROM metadata WHERE key='daily-stats-v1'",null).use { it.moveToFirst() }
+        db.execSQL("CREATE TABLE IF NOT EXISTS daily_completions(key TEXT PRIMARY KEY,day TEXT NOT NULL)")
+        val initialized=db.rawQuery("SELECT 1 FROM metadata WHERE key='daily-stats-v2'",null).use { it.moveToFirst() }
         if(initialized) return
-        db.rawQuery("SELECT payload FROM attempts",null).use { c ->
-            while(c.moveToNext()) runCatching { JSONObject(c.getString(0)) }.getOrNull()?.let { record(db,it) }
+        db.delete("daily_counts",null,null);db.delete("daily_completions",null,null)
+        // Read immutable batches before enriching legacy payloads, without mutating an open SELECT cursor.
+        var after=Long.MIN_VALUE
+        while(true) {
+            val batch=db.rawQuery("SELECT rowid,payload FROM attempts WHERE rowid>? ORDER BY rowid LIMIT 500",arrayOf(after.toString())).use { c ->
+                buildList { while(c.moveToNext()) add(c.getLong(0) to c.getString(1)) }
+            }
+            if(batch.isEmpty()) break
+            batch.forEach { (_,raw) -> runCatching { JSONObject(raw) }.getOrNull()?.let { record(db,it) } }
+            after=batch.last().first
         }
-        db.insertWithOnConflict("daily_goals",null,ContentValues().apply { put("day",today().toString());put("goal",100) },SQLiteDatabase.CONFLICT_IGNORE)
-        db.insertOrThrow("metadata",null,ContentValues().apply { put("key","daily-stats-v1");put("value","1") })
+        val hasGoals=db.rawQuery("SELECT 1 FROM daily_goals LIMIT 1",null).use { it.moveToFirst() }
+        if(!hasGoals) db.insertOrThrow("daily_goals",null,ContentValues().apply { put("day",today().toString());put("goal",100) })
+        db.insertOrThrow("metadata",null,ContentValues().apply { put("key","daily-stats-v2");put("value","1") })
     }
     fun stamp(attempt: JSONObject): JSONObject {
         val time=now()
@@ -30,7 +40,7 @@ internal class DailyTracking(private val now: () -> Instant, private val zone: (
     }
     fun record(db: SQLiteDatabase, attempt: JSONObject) {
         if(attempt.optString("outcome") !in listOf("correct","incorrect","skipped")) return
-        if(Mode.entries.none { it.name==attempt.optString("mode") }) return
+        val mode=Mode.entries.firstOrNull { it.name==attempt.optString("mode") } ?: return
         val count=attempt.optJSONObject("changes")?.length() ?: return
         if(count==0) return
         val day=runCatching {
@@ -38,14 +48,23 @@ internal class DailyTracking(private val now: () -> Instant, private val zone: (
             else if(attempt.has("time") && attempt.optLong("time",-1)>=0) parseDay(Instant.ofEpochMilli(attempt.getLong("time")).atZone(zone()).toLocalDate().toString())
             else null
         }.getOrNull() ?: return // Old markers without a timestamp cannot establish a historical day.
+        // Keep zero-count days and freeze legacy dates even when an incomplete retry is excluded.
         db.insertWithOnConflict("daily_counts",null,ContentValues().apply { put("day",day.toString());put("count",0) },SQLiteDatabase.CONFLICT_IGNORE)
-        db.execSQL("UPDATE daily_counts SET count=count+? WHERE day=?",arrayOf(count,day.toString()))
         // Freeze the first recovered day of legacy data, so later exports cannot move it across timezones.
         if(!attempt.has("localDay") && attempt.optString("id").isNotBlank()) {
             attempt.put("localDay",day.toString())
             db.update("attempts",ContentValues().apply { put("payload",attempt.toString()) },"id=?",arrayOf(attempt.getString("id")))
         }
+        if(attempt.optString("outcome")=="incorrect" && mode in listOf(Mode.MATCH,Mode.TO_EL,Mode.TO_RU,Mode.LISTEN_EASY)) return
+        val key=attempt.optString("practiceKey").takeIf { it.isNotBlank() }
+            ?: attempt.optString("id").takeIf { it.isNotBlank() }?.let { "attempt:$it" } ?: return
+        val inserted=db.insertWithOnConflict("daily_completions",null,ContentValues().apply { put("key",key);put("day",day.toString()) },SQLiteDatabase.CONFLICT_IGNORE)
+        if(inserted == -1L) return
+        db.execSQL("UPDATE daily_counts SET count=count+? WHERE day=?",arrayOf(count,day.toString()))
+
     }
+    fun completed(db: SQLiteDatabase,key: String): Boolean =
+        db.rawQuery("SELECT 1 FROM daily_completions WHERE key=?",arrayOf(key)).use { it.moveToFirst() }
     fun get(db: SQLiteDatabase, day: LocalDate=today()): DailyProgress {
         val count=db.rawQuery("SELECT count FROM daily_counts WHERE day=?",arrayOf(day.toString())).use { if(it.moveToFirst()) it.getLong(0) else 0L }
         val goal=db.rawQuery("SELECT goal FROM daily_goals WHERE day<=? ORDER BY day DESC LIMIT 1",arrayOf(day.toString())).use { if(it.moveToFirst()) it.getInt(0) else null }

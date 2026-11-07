@@ -61,7 +61,7 @@ class StoreTest {
         old.execSQL("INSERT INTO attempts VALUES ('legacy-attempt','{}')")
         old.version=1;old.close()
         store=Store(context);store.seed()
-        assertEquals(5,store.readableDatabase.version)
+        assertEquals(6,store.readableDatabase.version)
         val ids=store.words().map { it.id }.toSet()
         for(i in 0 until starter.length()) assertTrue(starter.getJSONObject(i).getString("id") in ids)
         assertTrue("custom-before-update" in ids)
@@ -97,7 +97,7 @@ class StoreTest {
         store.apply("at-cap",Mode.TO_EL,mapOf(id to Points.MAX),"correct")
         store.writableDatabase.execSQL("DROP TABLE session_balances");store.writableDatabase.execSQL("DROP TABLE review_queue");store.writableDatabase.version=2
         store.close();store=Store(context)
-        assertEquals(5,store.readableDatabase.version);assertEquals(Points.MAX,store.points(id,0))
+        assertEquals(6,store.readableDatabase.version);assertEquals(Points.MAX,store.points(id,0))
         store.apply("cap-right",Mode.TO_EL,mapOf(id to Points.fraction(1,1)),"correct","cap-run")
         store.apply("cap-wrong",Mode.TO_EL,mapOf(id to Points.fraction(-1,1)),"incorrect","cap-run")
         assertEquals(Points.fraction(24,1),store.points(id,0))
@@ -126,7 +126,7 @@ class StoreTest {
         store.apply("before-upgrade-error",Mode.TO_EL,mapOf(id to Points.fraction(-1,1)),"incorrect","old-run")
         store.writableDatabase.execSQL("DROP TABLE review_queue");store.writableDatabase.version=3
         store.close();store=Store(context)
-        assertEquals(5,store.readableDatabase.version)
+        assertEquals(6,store.readableDatabase.version)
         store.apply("after-upgrade-correct",Mode.TO_EL,mapOf(id to Points.fraction(1,1)),"correct","old-run")
         assertEquals(Points.ZERO,store.points(id,0));assertTrue(store.reviewIds(Mode.TO_EL).isEmpty())
     }

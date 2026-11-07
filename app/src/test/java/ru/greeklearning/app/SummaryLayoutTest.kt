@@ -108,7 +108,7 @@ class SummaryLayoutTest {
         val controller=Robolectric.buildActivity(MainActivity::class.java).setup();val activity=controller.get()
         try {
             views(activity.window.decorView).filterIsInstance<Button>().first { it.text.toString()=="Начать тренировку" }.performClick()
-            views(activity.window.decorView).filterIsInstance<Button>().first { it.text.toString()=="Настроить количество слов" }.performClick()
+            views(activity.window.decorView).filterIsInstance<android.widget.ImageButton>().single { it.contentDescription=="Настроить количество слов" }.performClick()
             shadowOf(Looper.getMainLooper()).idle()
             val content=activity.window.decorView.findViewWithTag<LinearLayout>("screen-content")
             assertNull(content.animation)
