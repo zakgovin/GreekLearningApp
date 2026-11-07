@@ -8,7 +8,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-class Store(private val context: Context) : SQLiteOpenHelper(context, "learning.db", null, 4) {
+class Store(private val context: Context,
+            now: () -> java.time.Instant = { java.time.Instant.now() },
+            zone: () -> java.time.ZoneId = { java.time.ZoneId.systemDefault() }) : SQLiteOpenHelper(context, "learning.db", null, 5) {
+    private val daily=DailyTracking(now,zone)
+    fun today()=daily.today()
+    fun dailyProgress(day: java.time.LocalDate=today())=daily.get(readableDatabase,day)
+    fun firstActivityDay()=daily.firstDay(readableDatabase)
+    fun dailyGoal()=dailyProgress().goal ?: 100
+    fun setDailyGoal(goal: Int)=daily.setGoal(writableDatabase,goal)
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE words(id TEXT PRIMARY KEY, payload TEXT NOT NULL)")
         db.execSQL("CREATE TABLE progress(wordId TEXT NOT NULL, skill INTEGER NOT NULL, points TEXT NOT NULL, PRIMARY KEY(wordId,skill))")
@@ -16,15 +24,17 @@ class Store(private val context: Context) : SQLiteOpenHelper(context, "learning.
         db.execSQL("CREATE TABLE metadata(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
         createSessionBalances(db)
         createReviewQueue(db)
+        daily.initialize(db)
     }
     private fun createSessionBalances(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE session_balances(sessionId TEXT NOT NULL,wordId TEXT NOT NULL,skill INTEGER NOT NULL,balance TEXT NOT NULL,PRIMARY KEY(sessionId,wordId,skill))")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        require(oldVersion in 1..3 && newVersion == 4) { "Explicit non-destructive migration required: $oldVersion → $newVersion" }
+        require(oldVersion in 1..4 && newVersion == 5) { "Explicit non-destructive migration required: $oldVersion → $newVersion" }
         if (oldVersion < 2) db.execSQL("CREATE TABLE metadata(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
         if (oldVersion < 3) createSessionBalances(db)
-        createReviewQueue(db)
+        if(oldVersion < 4) createReviewQueue(db)
+        if(oldVersion < 5) daily.initialize(db)
     }
     private fun createReviewQueue(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE review_queue(wordId TEXT NOT NULL,mode TEXT NOT NULL,originSession TEXT NOT NULL,queuedAt INTEGER NOT NULL,PRIMARY KEY(wordId,mode))")
@@ -75,8 +85,8 @@ class Store(private val context: Context) : SQLiteOpenHelper(context, "learning.
     fun apply(attemptId: String, mode: Mode, changes: Map<String, Points>, outcome: String, sessionId: String? = null): Boolean {
         val db = writableDatabase; db.beginTransaction()
         try {
-            val attempt = JSONObject().put("id", attemptId).put("mode", mode.name).put("outcome", outcome)
-                .put("sessionId",sessionId).put("time", System.currentTimeMillis()).put("changes", JSONObject().apply { changes.forEach { (id, d) -> put(id, d.toString()) } })
+            val attempt = daily.stamp(JSONObject().put("id", attemptId).put("mode", mode.name).put("outcome", outcome)
+                .put("sessionId",sessionId).put("changes", JSONObject().apply { changes.forEach { (id, d) -> put(id, d.toString()) } }))
             val inserted = db.insertWithOnConflict("attempts", null, ContentValues().apply { put("id", attemptId); put("payload", attempt.toString()) }, SQLiteDatabase.CONFLICT_IGNORE)
             if (inserted == -1L) { db.setTransactionSuccessful(); return false }
             changes.forEach { (id, delta) ->
@@ -104,6 +114,7 @@ class Store(private val context: Context) : SQLiteOpenHelper(context, "learning.
                     db.delete("review_queue","wordId=? AND mode=? AND originSession<>?",arrayOf(id,mode.name,sessionId))
                 }
             }
+            daily.record(db,attempt)
             db.setTransactionSuccessful(); return true
         } finally { db.endTransaction() }
     }
@@ -128,6 +139,7 @@ class Store(private val context: Context) : SQLiteOpenHelper(context, "learning.
                 while(c.moveToNext()) put(JSONObject().put("wordId",c.getString(0)).put("mode",c.getString(1)).put("originSession",c.getString(2)).put("queuedAt",c.getLong(3)))
             }
         })
+        root.put("dailyGoalHistory",daily.exportGoals(readableDatabase)).put("dailyGoal",dailyGoal())
         val prefs = context.getSharedPreferences("settings", 0)
         root.put("settings", JSONObject().apply { Mode.entries.forEach { put(it.name, prefs.getInt(it.name, 10)) } })
         return root.toString(2)
@@ -150,6 +162,13 @@ class Store(private val context: Context) : SQLiteOpenHelper(context, "learning.
         val settings = root.optJSONObject("settings")
         settings?.keys()?.forEach { key -> require(Mode.entries.any { it.name == key } && settings.getInt(key) in 1..100) }
         val attempts = root.optJSONArray("attempts") ?: JSONArray(); require(attempts.length() <= 100000)
+        val goals=root.optJSONArray("dailyGoalHistory") ?: JSONArray()
+        daily.validateGoals(goals)
+        if(root.has("dailyGoal")) require(root.getInt("dailyGoal") in 10..10000) { "Некорректная дневная цель" }
+        for(i in 0 until attempts.length()) {
+            val a=attempts.getJSONObject(i)
+            if(a.has("localDay")) DailyTracking.parseDay(a.getString("localDay"))
+        }
         val review=root.optJSONArray("reviewQueue") ?: JSONArray()
         require(review.length()<=words.size*Mode.entries.size)
         val seenReview=mutableSetOf<String>()
@@ -171,7 +190,8 @@ class Store(private val context: Context) : SQLiteOpenHelper(context, "learning.
             }
             for (i in 0 until attempts.length()) {
                 val a = attempts.getJSONObject(i)
-                db.insertWithOnConflict("attempts", null, ContentValues().apply { put("id", a.getString("id")); put("payload", a.toString()) }, SQLiteDatabase.CONFLICT_IGNORE)
+                val inserted=db.insertWithOnConflict("attempts", null, ContentValues().apply { put("id", a.getString("id")); put("payload", a.toString()) }, SQLiteDatabase.CONFLICT_IGNORE)
+                if(inserted != -1L) daily.record(db,a)
             }
             for(i in 0 until review.length()) {
                 val item=review.getJSONObject(i)
@@ -179,6 +199,8 @@ class Store(private val context: Context) : SQLiteOpenHelper(context, "learning.
                     put("wordId",item.getString("wordId"));put("mode",item.getString("mode"));put("originSession",item.getString("originSession"));put("queuedAt",item.getLong("queuedAt"))
                 },SQLiteDatabase.CONFLICT_REPLACE)
             }
+            daily.importGoals(db,goals)
+            if(root.has("dailyGoal")) daily.setGoal(db,root.getInt("dailyGoal"))
             db.setTransactionSuccessful()
         } finally { db.endTransaction() }
         settings?.let { value -> context.getSharedPreferences("settings", 0).edit().apply {

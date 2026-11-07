@@ -34,6 +34,18 @@ import java.util.UUID
 
 class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val wordDetails by lazy { WordDetails(this) }
+    private var dailyPageIndex: Int? = null
+    private var homeVisible=false
+    private val dailyHandler=android.os.Handler(android.os.Looper.getMainLooper())
+    private val dayRefresh=Runnable { refreshDailyScreen() }
+    private var dailyReceiverRegistered=false
+    private val dailyReceiver=object: android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?,intent: Intent?) { refreshDailyScreen() }
+    }
+    private fun refreshDailyScreen() {
+        if(!activityActive) return
+        if(homeVisible) home() else dailyPageIndex?.let { dailyHistory(it) }
+    }
     private var detailBack: (() -> Unit)? = null
     private lateinit var store: Store
     private var fixedFooter: LinearLayout? = null
@@ -105,10 +117,20 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     override fun onResume() {
         super.onResume()
         activityActive = true
+        if(!dailyReceiverRegistered) {
+            val filter=android.content.IntentFilter().apply {
+                addAction(Intent.ACTION_DATE_CHANGED);addAction(Intent.ACTION_TIME_CHANGED);addAction(Intent.ACTION_TIMEZONE_CHANGED)
+            }
+            if(android.os.Build.VERSION.SDK_INT>=33) registerReceiver(dailyReceiver,filter,android.content.Context.RECEIVER_NOT_EXPORTED)
+            else registerReceiver(dailyReceiver,filter)
+            dailyReceiverRegistered=true
+        }
+        if(homeVisible) { home();return }
+        dailyPageIndex?.let { dailyHistory(it);return }
         if (trainingVisible && matchingFeedbackActive) { training(); return }
         if (trainingVisible && session?.optBoolean("answerAudioPending") == true && answerAudioToken == null) training()
     }
-    override fun onStop() { activityActive = false; super.onStop(); stopRecording(); suspendAnswerAudio(); tts?.stop() }
+    override fun onStop() { if(dailyReceiverRegistered) { unregisterReceiver(dailyReceiver);dailyReceiverRegistered=false };dailyHandler.removeCallbacks(dayRefresh); activityActive = false; super.onStop(); stopRecording(); suspendAnswerAudio(); tts?.stop() }
     override fun onDestroy() { activityActive = false; recognizer?.destroy(); tts?.shutdown(); store.close(); super.onDestroy() }
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
@@ -120,6 +142,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
     private fun shape(color: Int, radius: Int = 12) = GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat() }
     private fun screen(title: String, subtitle: String = "", onClose: (() -> Unit)? = null, closeDescription: String = "Выйти и сохранить", pinnedActions: Boolean = false) {
+        dailyHandler.removeCallbacks(dayRefresh)
+        homeVisible=false
+        dailyPageIndex=null
         detailBack = null
         trainingVisible = false
         matchingFeedbackActive = false
@@ -214,9 +239,27 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val list = words
         val scores = store.allPoints()
         val average = if (list.isEmpty()) Points.ZERO else scores.values.fold(Points.ZERO) { a, score -> a + score }.let { Points.of(it.n, it.d * list.size.toBigInteger()) }
-        label("${average.text()}%", 44, accent, true)
-        progress(average)
-        label("${list.size} слов в словаре · средний прогресс", 14, muted)
+        val today=store.dailyProgress()
+        val goal=today.goal ?: store.dailyGoal()
+        val panels=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
+        page.addView(panels,LinearLayout.LayoutParams(-1,-2))
+        fun panel(tagValue: String): LinearLayout = LinearLayout(this).apply {
+            orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(12),dp(14),dp(12));background=shape(Color.WHITE);tag=tagValue
+            panels.addView(this,LinearLayout.LayoutParams(0,-2,1f).apply { if(panels.childCount>0) leftMargin=dp(8) })
+        }
+        val totalPanel=panel("overall-progress")
+        label("Весь словарь",13,muted,parent=totalPanel)
+        label("${average.text()}%",28,accent,true,totalPanel)
+        label("${list.size} слов",13,muted,parent=totalPanel);progress(average,totalPanel)
+        val dayPanel=panel("daily-progress")
+        label("Сегодня",13,muted,parent=dayPanel)
+        label(today.count.toString(),28,accent,true,dayPanel).tag="daily-count"
+        label("из $goal · слов",13,muted,parent=dayPanel)
+        progress(Points.of(today.count.toBigInteger()*100.toBigInteger(),goal.toBigInteger()),dayPanel)
+        dayPanel.isClickable=true;dayPanel.isFocusable=true
+        dayPanel.contentDescription="Сегодня ${today.count} слов из $goal. Открыть историю по дням"
+        dayPanel.setOnClickListener { dailyHistory() }
+        button("История по дням") { dailyHistory() }
         gap()
         if (session != null) button("Продолжить тренировку", true) { training() }
         button("Начать тренировку", session == null) { setup() }
@@ -233,6 +276,53 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             if (session != null) { message("Сначала завершите или отмените текущую тренировку"); return@button }
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).setType("application/json").addCategory(Intent.CATEGORY_OPENABLE), 22)
         }
+        homeVisible=true;scheduleDayRefresh()
+    }
+    private fun scheduleDayRefresh() {
+        dailyHandler.removeCallbacks(dayRefresh)
+        if(activityActive && (homeVisible || dailyPageIndex!=null)) {
+            val now=java.time.ZonedDateTime.now()
+            val next=now.toLocalDate().plusDays(1).atStartOfDay(now.zone)
+            dailyHandler.postDelayed(dayRefresh,java.time.Duration.between(now,next).toMillis().coerceAtLeast(1))
+        }
+    }
+    private fun dailyGoalSettings(onSaved: () -> Unit) {
+        screen("Дневная цель","От 10 до 10 000 слов в день.",onClose=onSaved,closeDescription="Вернуться назад")
+        detailBack=onSaved
+        val field=input("10–10000",store.dailyGoal().toString()).apply { inputType=android.text.InputType.TYPE_CLASS_NUMBER;tag="daily-goal-input" }
+        label("Каждый ответ, ошибка или пропуск добавляет слово к дневному счётчику. Повторы учитываются заново. Неверная пара в сопоставлении учитывает оба слова. Нажатие подсказки и технические сбои звука сами по себе не считаются ответом.",15,muted)
+        label("Цель действует сегодня и в следующие дни. Можно тренироваться и после её достижения.",15,muted)
+        button("Сохранить",true) {
+            val goal=field.text.toString().toIntOrNull()
+            if(goal==null || goal !in 10..10000) { field.error="Введите целое число от 10 до 10000";return@button }
+            store.setDailyGoal(goal);onSaved()
+        }
+    }
+    private fun dailyHistory(pageIndex: Int=0) {
+        val today=store.today();val first=minOf(store.firstActivityDay(),today)
+        val maxPage=(java.time.temporal.ChronoUnit.DAYS.between(first,today)/30).toInt()
+        val index=pageIndex.coerceIn(0,maxPage)
+        val end=today.minusDays(index*30L);val start=maxOf(first,end.minusDays(29))
+        screen("История по дням","Каждое повторение слова учитывается. День — по времени телефона.",onClose=::home,closeDescription="На главную")
+        dailyPageIndex=index;detailBack=::home
+        button("Настроить дневную цель") { dailyGoalSettings { dailyHistory(index) } }
+        val format=java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy",Locale("ru"))
+        var date=end
+        while(!date.isBefore(start)) {
+            val result=store.dailyProgress(date)
+            val card=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(10),dp(14),dp(10));background=shape(Color.WHITE);tag="daily-history:$date" }
+            page.addView(card,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(8) })
+            label(date.format(format),15,ink,true,card)
+            label(if(result.goal!=null) "${result.count} / ${result.goal} слов" else "${result.count} слов · цель ещё не была задана",16,accent,parent=card)
+            if(result.goal!=null) {
+                progress(Points.of(result.count.toBigInteger()*100.toBigInteger(),result.goal.toBigInteger()),card)
+                if(result.count>=result.goal) label("Цель достигнута",13,success,parent=card)
+            }
+            date=date.minusDays(1)
+        }
+        if(index>0) button("Более новые дни") { dailyHistory(index-1) }
+        if(index<maxPage) button("Более ранние дни") { dailyHistory(index+1) }
+        scheduleDayRefresh()
     }
     private fun dictionary(query: String = "", pageIndex: Int = 0, category: String? = null) {
         screen("Мой словарь", "Каждый навык — до 25%. Вместе — до 100%.",onClose=::home,closeDescription="На главную")
@@ -362,14 +452,20 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         label("Готовые примеры: участники Tatoeba (CC BY 2.0). Учебные примеры подготовлены для приложения. Формы: Modern Greek Inflexion (MIT).",12,muted)
     }
     private fun settings() {
-        screen("Размер тренировок", "Отдельное число слов для каждого режима: от 1 до 100.",onClose=::setup,closeDescription="Вернуться к выбору тренировки")
+        screen("Настройки тренировок", "Дневная цель и число слов для каждого режима.",onClose=::setup,closeDescription="Вернуться к выбору тренировки")
+        label("Дневная цель · 10–10000",17,ink,true)
+        val dailyGoalField=input("10–10000",store.dailyGoal().toString()).apply { inputType=android.text.InputType.TYPE_CLASS_NUMBER;tag="daily-goal-input" }
+        label("Слов в одной тренировке · 1–100",17,ink,true)
         val fields = Mode.entries.associateWith { mode ->
             label(mode.label, 17, ink, true)
             input("1–100", prefs.getInt(mode.name,10).coerceIn(1,100).toString()).apply { inputType = android.text.InputType.TYPE_CLASS_NUMBER }
         }
         button("Сохранить", true) {
+            val goal=dailyGoalField.text.toString().toIntOrNull()
+            if(goal==null || goal !in 10..10000) { dailyGoalField.error="Введите целое число от 10 до 10000";return@button }
             val values = fields.mapValues { it.value.text.toString().toIntOrNull() }
             if (values.values.any { it == null || it !in 1..100 }) { message("Каждое значение должно быть целым от 1 до 100"); return@button }
+            store.setDailyGoal(goal)
             prefs.edit().apply { values.forEach { (m,v) -> putInt(m.name,v!!) } }.commit()
             message("Настройки сохранены"); setup()
         }

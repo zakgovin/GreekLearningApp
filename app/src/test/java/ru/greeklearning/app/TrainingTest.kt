@@ -512,5 +512,20 @@ class TrainingTest {
         session(Mode.SPEAK,listOf(word));click("Пропустить · −1%")
         assertEquals(Points.fraction(1,1),store.points(word.id,3))
         assertTrue(all().filterIsInstance<android.widget.TextView>().any { it.text.toString().contains(word.display) })
+    }    @Test fun dailyPracticeCountsRealAttemptsButNotSpeechCompletionOrRecreation() {
+        val list=listOf(store.words().first { it.greek=="νερό" },store.words().first { it.greek=="σπίτι" })
+        session(Mode.TO_EL,list)
+        val options=saved().getJSONArray("options")
+        val wrong=(0 until options.length()).map { options.getString(it) }.first { it!=list[0].id }
+        click(store.words().first { it.id==wrong }.display)
+        assertEquals(1L,store.dailyProgress().count)
+        click(list[0].display);assertEquals(2L,store.dailyProgress().count)
+        val token=audioToken();finishAudio(token);finishAudio(token)
+        assertEquals(2L,store.dailyProgress().count)
+        all().filterIsInstance<android.widget.ImageButton>().single { it.contentDescription=="Выйти и сохранить" }.performClick()
+        assertEquals("2",all().filterIsInstance<android.widget.TextView>().single { it.tag=="daily-count" }.text.toString())
+        controller!!.pause().stop().destroy();controller=Robolectric.buildActivity(MainActivity::class.java).setup()
+        assertEquals("2",all().filterIsInstance<android.widget.TextView>().single { it.tag=="daily-count" }.text.toString())
     }
+
 }

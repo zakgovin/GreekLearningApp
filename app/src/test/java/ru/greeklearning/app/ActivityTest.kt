@@ -121,7 +121,7 @@ class ActivityTest {
         assertTrue(all().filterIsInstance<TextView>().any { it.text.toString()=="Греческий каждый день" })
         assertFalse(all().filterIsInstance<Button>().any { it.text.toString()=="Настройки тренировок" })
         click("Начать тренировку");click("Настроить количество слов")
-        val fields=all().filterIsInstance<EditText>();assertEquals(7,fields.size)
+        val fields=all().filterIsInstance<EditText>().filter { it.tag!="daily-goal-input" };assertEquals(7,fields.size)
         fields.first().setText("1");fields.last().setText("100");click("Сохранить")
         assertEquals(1,activity.getSharedPreferences("settings",0).getInt(Mode.TO_RU.name,0))
         assertEquals(100,activity.getSharedPreferences("settings",0).getInt(Mode.SPEAK.name,0))
