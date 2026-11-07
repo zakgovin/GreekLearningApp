@@ -6,8 +6,8 @@ android {
         applicationId = "ru.greeklearning.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 31
-        versionName = "0.3.17"
+        versionCode = 32
+        versionName = "0.4.0"
         testInstrumentationRunner = "android.test.InstrumentationTestRunner"
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }

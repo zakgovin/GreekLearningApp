@@ -1,0 +1,11 @@
+{
+  "words": 1724,
+  "readyExamplesWords": 820,
+  "grammarKinds": {
+    "noun": 980,
+    "verb": 241,
+    "adjective": 187,
+    "other": 316
+  },
+  "errors": {}
+}

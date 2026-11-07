@@ -33,6 +33,8 @@ import java.util.Locale
 import java.util.UUID
 
 class MainActivity : Activity(), TextToSpeech.OnInitListener {
+    private val wordDetails by lazy { WordDetails(this) }
+    private var detailBack: (() -> Unit)? = null
     private lateinit var store: Store
     private var fixedFooter: LinearLayout? = null
     private lateinit var page: LinearLayout
@@ -67,6 +69,11 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         session = runtime.getString("session", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
         tts = TextToSpeech(this, this)
         home()
+        runtime.getString("word-card",null)?.let { saved ->
+            runCatching { JSONObject(saved) }.getOrNull()?.let { route ->
+                words.firstOrNull { it.id==route.optString("id") }?.let { wordCard(it,route) }
+            }
+        }
     }
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
@@ -104,6 +111,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     override fun onDestroy() { activityActive = false; recognizer?.destroy(); tts?.shutdown(); store.close(); super.onDestroy() }
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        detailBack?.let { it();return }
         if (session != null) AlertDialog.Builder(this).setTitle("Выйти из тренировки?")
             .setMessage("Ответы и текущий ввод сохранятся. Продолжить можно с главного экрана.")
             .setPositiveButton("Выйти") { _, _ -> stopRecording(); tts?.stop(); home() }.setNegativeButton("Остаться", null).show()
@@ -111,6 +119,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
     private fun shape(color: Int, radius: Int = 12) = GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat() }
     private fun screen(title: String, subtitle: String = "", onClose: (() -> Unit)? = null, closeDescription: String = "Выйти и сохранить", pinnedActions: Boolean = false) {
+        detailBack = null
         trainingVisible = false
         matchingFeedbackActive = false
         val screenKey = "$title|$subtitle"
@@ -257,9 +266,83 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             if(w.inflections.isNotEmpty()) label("Формы: ${w.inflections.joinToString(", ")}",13,muted,parent=card)
             if(w.sourcePages.isNotEmpty()) label("ΚΛΙΚ A2 · стр. ${w.sourcePages.sorted().joinToString(", ")}",12,muted,parent=card)
             button("Послушать", parent=card) { speak(w.greek) }
+            card.isClickable=true;card.isFocusable=true
+            card.contentDescription="${w.display}. ${w.russian.joinToString(", ")}. Открыть полную карточку"
+            card.setOnClickListener {
+                val route=JSONObject().put("id",w.id).put("origin","dictionary").put("query",query).put("page",index)
+                    .put("category",category).put("scroll",(page.parent as? ScrollView)?.scrollY ?: 0)
+                wordCard(w,route)
+            }
         }
         if(index>0) button("Предыдущая страница") { dictionary(query,index-1,category) }
         if((index+1)*pageSize<matches.size) button("Следующая страница") { dictionary(query,index+1,category) }
+    }
+    private fun wordCard(word: Word, route: JSONObject) {
+        runtime.edit().putString("word-card",route.toString()).commit()
+        fun closeCard() {
+            runtime.edit().remove("word-card").commit()
+            tts?.stop()
+            if(route.optString("origin")=="summary" && session!=null) summary()
+            else dictionary(route.optString("query"),route.optInt("page"),route.optString("category").takeIf { it.isNotBlank() && it!="null" })
+            (page.parent as? ScrollView)?.let { scroll -> scroll.post { scroll.scrollTo(0,route.optInt("scroll")) } }
+        }
+        screen(word.display,word.russian.joinToString(", "),onClose=::closeCard,closeDescription="Вернуться к списку слов")
+        detailBack=::closeCard
+        label(Rules.parts[word.category] ?: word.pos,14,muted)
+        label("Изучено ${store.total(word).text()}%",22,green,true)
+        label("Перевод ${store.points(word.id,0).text()}% · Написание ${store.points(word.id,1).text()}%\nСлух ${store.points(word.id,2).text()}% · Произношение ${store.points(word.id,3).text()}%",13,muted)
+        button("▶ Произнести слово") { speak(word.greek) }
+        val details=wordDetails.get(word.id)
+        gap(8);label("Примеры употребления",20,ink,true)
+        val examples=details?.optJSONArray("examples")
+        if(examples==null || examples.length()==0) label("Для добавленного слова примеры ещё не подготовлены.",15,muted)
+        else for(i in 0 until minOf(3,examples.length())) {
+            val e=examples.getJSONObject(i)
+            val card=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(10),dp(14),dp(10));background=shape(Color.WHITE) }
+            page.addView(card,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(8) })
+            label(e.getString("greek"),19,ink,parent=card)
+            label(e.getString("russian"),16,muted,parent=card)
+            label(e.optString("source"),12,muted,parent=card)
+        }
+        val grammar=details?.optJSONObject("grammar")
+        if(grammar!=null) {
+            gap(16);label("Формы слова · A2",20,ink,true)
+            fun table(data: JSONObject) {
+                val headers=data.getJSONArray("headers");val rows=data.getJSONArray("rows")
+                val container=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;setPadding(dp(10),dp(8),dp(10),dp(8));background=shape(Color.WHITE) }
+                page.addView(container,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(10) })
+                for(r in -1 until rows.length()) {
+                    val values=if(r<0) headers else rows.getJSONArray(r)
+                    val line=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL }
+                    container.addView(line,LinearLayout.LayoutParams(-1,-2))
+                    for(c in 0 until values.length()) label(
+                        values.getString(c).let { value -> if(c==0 && grammar.optString("kind")=="noun") value.replace("Именительный · ","Именит.\n").replace("Родительный · ","Родит.\n").replace("Винительный · ","Винит.\n") else value },
+                        if(r<0) 12 else 15,if(c==0 || r<0) muted else ink,r<0,line).apply {
+                        layoutParams=LinearLayout.LayoutParams(0,-2,1f);setPadding(dp(3),dp(7),dp(3),dp(7))
+                    }
+                }
+            }
+            if(grammar.has("rows")) table(grammar)
+            grammar.optJSONArray("tenses")?.let { tenses ->
+                val holder=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
+                val titles=(0 until tenses.length()).map { tenses.getJSONObject(it).getString("title") }
+                val select=spinner(titles)
+                page.addView(holder)
+                fun render(position: Int) {
+                    holder.removeAllViews()
+                    val outer=page;page=holder
+                    table(tenses.getJSONObject(position));page=outer
+                }
+                select.onItemSelectedListener=object: AdapterView.OnItemSelectedListener {
+                    override fun onItemSelected(p: AdapterView<*>?,v: View?,position: Int,id: Long) { render(position) }
+                    override fun onNothingSelected(p: AdapterView<*>?) {}
+                }
+                render(0)
+            }
+            label(grammar.optString("note"),14,muted)
+        }
+        gap(16);label("Источники",16,ink,true)
+        label("Готовые примеры: участники Tatoeba (CC BY 2.0). Учебные примеры подготовлены для приложения. Формы: Modern Greek Inflexion (MIT).",12,muted)
     }
     private fun settings() {
         screen("Размер тренировок", "Отдельное число слов для каждого режима: от 1 до 100.",onClose=::setup,closeDescription="Вернуться к выбору тренировки")
@@ -636,6 +719,10 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_YES
             }
             table.addView(row,LinearLayout.LayoutParams(-1,-2))
+            row.isClickable=true;row.isFocusable=true
+            row.setOnClickListener {
+                wordCard(word,JSONObject().put("id",word.id).put("origin","summary").put("scroll",(page.parent as? ScrollView)?.scrollY ?: 0))
+            }
             label(word.display,18,ink,parent=row).apply {
                 layoutParams=LinearLayout.LayoutParams(0,-2,1f);importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO
             }
