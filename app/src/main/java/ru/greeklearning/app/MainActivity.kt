@@ -501,8 +501,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         label("Тренировка", 15, muted)
         val mode = spinner(Mode.entries.map { it.label }); mode.setSelection(chosenMode.ordinal)
         fun description(selected: Mode) = when(selected) {
-            Mode.TO_RU -> "Выберите русский перевод греческого слова. Неверный вариант подсветится красным — пробуйте до правильного ответа. +1% за верный ответ, −1% за каждый неверный выбор."
-            Mode.TO_EL -> "Выберите греческое слово по русскому переводу. Неверный вариант подсветится красным — пробуйте до правильного ответа. +1% за верный ответ, −1% за каждый неверный выбор."
+            Mode.TO_RU -> "Выберите русский перевод греческого слова. Неверный вариант подсветится красным — пробуйте до правильного ответа. Итог за слово: без ошибок +1%, с одной ошибкой +0,5%, с двумя и более −1%."
+            Mode.TO_EL -> "Выберите греческое слово по русскому переводу. Неверный вариант подсветится красным — пробуйте до правильного ответа. Итог за слово: без ошибок +1%, с одной ошибкой +0,5%, с двумя и более −1%."
             Mode.MATCH -> "Соедините греческие слова с русскими переводами. На экране до 5 пар. Верная пара: +1%; неверная: −1% обоим словам. После верной пары прозвучит греческое слово."
             Mode.WRITE -> "Напишите греческое слово по русскому переводу, в базовой форме с правильным артиклем или без него. +1% за верный ответ, −1% за ошибку. Подсказка открывает по букве и пропорционально уменьшает награду; полностью открытое слово даёт 0%."
             Mode.LISTEN_EASY -> "Послушайте греческое слово и выберите русский перевод. +1% за верный ответ, −1% за каждый неверный выбор. После правильного выбора появится греческое написание."
@@ -625,7 +625,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                         choice.background = shape(Color.rgb(211, 233, 215)); choice.setTextColor(success)
                     }
                 }
-                if (s.optBoolean("choiceError") && !pending) label("Неверно · −1%. Выберите другой ответ.", 16, Color.rgb(164,40,34))
+                if (s.optBoolean("choiceError") && !pending) label(if(mode in listOf(Mode.TO_RU,Mode.TO_EL)) "Неверно. Выберите другой ответ." else "Неверно · −1%. Выберите другой ответ.", 16, Color.rgb(164,40,34))
             }
             Mode.WRITE, Mode.LISTEN_HARD -> {
                 val field = input(if(mode == Mode.WRITE) "Ответ по-гречески" else "Перевод по-русски",s.optString("draft"))
@@ -699,7 +699,11 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val hints = if(mode == Mode.WRITE) s.optInt("hints") else 0
         val delta = Rules.delta(correct,skipped,hints,Rules.letterCount(w.greek))
         val runId=scoringSessionId(mode)
-        store.apply(s.getString("attempt"),mode,mapOf(w.id to delta),if(skipped) "skipped" else if(correct) "correct" else "incorrect",runId,"$runId:${mode.name}:${s.getInt("index")}:${w.id}")
+        val practiceKey="$runId:${mode.name}:${s.getInt("index")}:${w.id}"
+        val translation=mode in listOf(Mode.TO_RU,Mode.TO_EL)
+        val oldErrors=s.optJSONArray("wrongOptions")?.length() ?: 0
+        if(translation && oldErrors>0) store.seedLegacyChoice(practiceKey,oldErrors)
+        store.apply(s.getString("attempt"),mode,mapOf(w.id to delta),if(skipped) "skipped" else if(correct) "correct" else "incorrect",runId,practiceKey,choiceScoring=translation)
         val key = if(!correct) "wrong" else if(hints>0) "assisted" else "right"
         s.put(key,s.getInt(key)+1)
         if(mode in listOf(Mode.WRITE,Mode.LISTEN_HARD) && correct && !skipped) {

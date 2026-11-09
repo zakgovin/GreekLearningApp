@@ -4,6 +4,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class LearningTest {
+    @Test fun translationQuestionTotalsHaveHalfCreditAndBoundedPenalty() {
+        assertEquals(Points.fraction(1,1),Rules.choiceTotal(0,true))
+        assertEquals(Points.ZERO,Rules.choiceTotal(1,false))
+        assertEquals(Points.fraction(1,2),Rules.choiceTotal(1,true))
+        for(errors in 2..20) {
+            assertEquals(Points.fraction(-1,1),Rules.choiceTotal(errors,false))
+            assertEquals(Points.fraction(-1,1),Rules.choiceTotal(errors,true))
+        }
+    }
     @Test fun exactHintFractionsAccumulateWithoutRounding() {
         val third = Rules.delta(true,hints=2,length=3)
         assertEquals(Points.fraction(1,1), third+third+third)

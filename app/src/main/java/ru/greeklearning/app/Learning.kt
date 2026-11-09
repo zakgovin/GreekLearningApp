@@ -49,6 +49,15 @@ data class Word(val id: String, val greek: String, val russian: List<String>, va
 }
 
 object Rules {
+    fun choiceTotal(errors: Int,correct: Boolean): Points {
+        require(errors>=0)
+        return when {
+            errors>=2 -> Points.fraction(-1,1)
+            !correct -> Points.ZERO
+            errors==1 -> Points.fraction(1,2)
+            else -> Points.fraction(1,1)
+        }
+    }
     val parts = linkedMapOf("noun" to "Существительные", "proper_noun" to "Имена собственные", "verb" to "Глаголы", "adjective" to "Прилагательные",
         "adverb" to "Наречия", "pronoun" to "Местоимения", "numeral" to "Числительные", "phrase" to "Выражения",
         "preposition" to "Предлоги", "conjunction" to "Союзы", "particle" to "Частицы", "article" to "Артикли")

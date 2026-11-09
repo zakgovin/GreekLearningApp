@@ -97,7 +97,7 @@ class TrainingTest {
         assertEquals(0,saved().getInt("index"))
         assertTrue(all().filterIsInstance<android.widget.TextView>().any { it.text.toString()==list[0].display })
         assertFalse(all().filterIsInstance<Button>().first { it.text.toString()==wrong.russian.first() }.isEnabled)
-        assertEquals(Points.fraction(2,1),store.points(list[0].id,0))
+        assertEquals(Points.fraction(3,1),store.points(list[0].id,0))
     }
     @Test fun allTrainingModesHaveTopRightCloseAndNoBottomExit() {
         val list=store.words().filter { it.category=="noun" }.take(2)
@@ -144,7 +144,7 @@ class TrainingTest {
         assertEquals(list.map { it.id },saved().getJSONArray("ids").let { a -> (0 until a.length()).map { a.getString(it) } })
         assertFalse(all().filterIsInstance<Button>().any { it.text.toString().startsWith("Пропустить") })
     }
-    @Test fun chooseWordMistakeAtZeroThenCorrectionShowsZeroChangeInSummary() {
+    @Test fun chooseWordMistakeAtZeroThenCorrectionShowsHalfPointInSummary() {
         val word=store.words().first { it.greek=="νερό" };session(Mode.TO_EL,listOf(word))
         val wrongId=saved().getJSONArray("options").let { a -> (0 until a.length()).map { a.getString(it) }.first { it!=word.id } }
         click(store.words().first { it.id==wrongId }.display)
@@ -152,8 +152,8 @@ class TrainingTest {
         controller!!.pause().stop().destroy();controller=Robolectric.buildActivity(MainActivity::class.java).setup()
         controller!!.get().onInit(TextToSpeech.SUCCESS);click("Продолжить тренировку")
         click(word.display);finishAudio()
-        assertEquals(Points.ZERO,store.points(word.id,0))
-        assertEquals("0%",all().filterIsInstance<android.widget.TextView>().single { it.tag=="change:${word.id}" }.text.toString())
+        assertEquals(Points.fraction(1,2),store.points(word.id,0))
+        assertEquals("+0,5%",all().filterIsInstance<android.widget.TextView>().single { it.tag=="change:${word.id}" }.text.toString())
     }
     @Test fun skipIsAbsentInWritingAndInitialListeningButRetainedInAdvancedAndSpeaking() {
         val word=store.words().first { it.greek=="νερό" }
@@ -177,13 +177,13 @@ class TrainingTest {
         val wrong=(0 until options.length()).map { id -> store.words().first { it.id==options.getString(id) } }.filter { it.id!=word.id }.take(2)
         val stale=all().filterIsInstance<Button>().first { it.text.toString()==wrong[0].russian.first() }
         stale.performClick();stale.performClick()
-        assertEquals(Points.fraction(2,1),store.points(word.id,0))
+        assertEquals(Points.fraction(3,1),store.points(word.id,0))
         val red=all().filterIsInstance<Button>().first { it.text.toString()==wrong[0].russian.first() }
         assertFalse(red.isEnabled)
         assertEquals(android.graphics.Color.rgb(252,218,215),(red.background as GradientDrawable).color!!.defaultColor)
         assertFalse(all().filterIsInstance<Button>().any { it.text.toString()=="Далее" || it.text.toString()=="Послушать правильный ответ" })
         click(wrong[1].russian.first())
-        assertEquals(Points.fraction(1,1),store.points(word.id,0));assertEquals(0,saved().getInt("index"))
+        assertEquals(Points.fraction(2,1),store.points(word.id,0));assertEquals(0,saved().getInt("index"))
         click(word.russian.first())
         assertEquals(Points.fraction(2,1),store.points(word.id,0));assertTrue(saved().getBoolean("answerAudioPending"))
         finishAudio();assertEquals(1,saved().getInt("index"))
@@ -550,6 +550,44 @@ class TrainingTest {
             click(if(mode==Mode.TO_EL) list[0].display else list[0].russian.first())
             assertEquals(before+1,store.dailyProgress().count);finishAudio()
             assertEquals(before+1,store.dailyProgress().count)
+            controller!!.pause().stop().destroy();controller=null
+        }
+    }
+    @Test fun translationChoiceAwardsHalfAfterOneErrorAndRestoresThatState() {
+        for(mode in listOf(Mode.TO_RU,Mode.TO_EL)) {
+            val word=store.words().first { it.greek=="νερό" }
+            val before=store.points(word.id,0)
+            session(mode,listOf(word))
+            val options=saved().getJSONArray("options")
+            val wrongId=(0 until options.length()).map { options.getString(it) }.first { it!=word.id }
+            val wrong=store.words().first { it.id==wrongId }
+            click(if(mode==Mode.TO_EL) wrong.display else wrong.russian.first())
+            assertEquals(before,store.points(word.id,0))
+            controller!!.pause().stop().destroy();controller=Robolectric.buildActivity(MainActivity::class.java).setup()
+            controller!!.get().onInit(TextToSpeech.SUCCESS);click("Продолжить тренировку")
+            click(if(mode==Mode.TO_EL) word.display else word.russian.first())
+            assertEquals(before+Points.fraction(1,2),store.points(word.id,0))
+            finishAudio();assertEquals(before+Points.fraction(1,2),store.points(word.id,0))
+            assertEquals("+0,5%",all().filterIsInstance<android.widget.TextView>().single { it.tag=="change:${word.id}" }.text.toString())
+            controller!!.pause().stop().destroy();controller=null
+        }
+    }
+    @Test fun translationMultipleWrongChoicesNeverCostMoreThanOnePoint() {
+        for(mode in listOf(Mode.TO_RU,Mode.TO_EL)) {
+            val word=store.words().first { it.greek=="σπίτι" }
+            store.apply("baseline-$mode",Mode.TO_RU,mapOf(word.id to Points.fraction(5,1)),"correct")
+            val before=store.points(word.id,0);session(mode,listOf(word))
+            val options=saved().getJSONArray("options")
+            val wrong=(0 until options.length()).map { options.getString(it) }.filter { it!=word.id }.take(4)
+            assertTrue(wrong.size>=3)
+            wrong.forEachIndexed { index,id ->
+                val option=store.words().first { it.id==id }
+                click(if(mode==Mode.TO_EL) option.display else option.russian.first())
+                assertEquals(before+if(index==0) Points.ZERO else Points.fraction(-1,1),store.points(word.id,0))
+            }
+            click(if(mode==Mode.TO_EL) word.display else word.russian.first());finishAudio()
+            assertEquals(before-Points.fraction(1,1),store.points(word.id,0))
+            assertEquals("−1%",all().filterIsInstance<android.widget.TextView>().single { it.tag=="change:${word.id}" }.text.toString())
             controller!!.pause().stop().destroy();controller=null
         }
     }
